@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Instagram表示管理</title>
+<style>
+  :root { --line: #ddd; --muted: #777; --accent: #1f6feb; --ok: #1a7f37; --warn: #b35900; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Hiragino Sans", sans-serif; font-size: 14px; color: #222; background: #f6f7f9; }
+  header { position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  section { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; }
+  section h2 { font-size: 15px; margin: 0 0 10px; }
+  details > summary { cursor: pointer; font-weight: 600; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+  input[type=text], input[type=password], textarea { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font: inherit; }
+  textarea { min-height: 70px; }
+  button { font: inherit; padding: 6px 12px; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > * { flex: 1 1 200px; }
+  .status { font-size: 13px; color: var(--muted); }
+  .status.err { color: #c00; } .status.ok { color: var(--ok); }
+  .dirty { color: var(--warn); font-weight: 600; }
+  .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tabs button.on { background: #222; color: #fff; border-color: #222; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .item { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
+  .item.approved { border-color: var(--ok); box-shadow: 0 0 0 2px rgba(26,127,55,.25); }
+  .item .pv { height: 300px; overflow: hidden; background: #fafafa; position: relative; }
+  .item .pv iframe { width: 100%; height: 560px; border: 0; pointer-events: none; }
+  .item .pv .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #aaa; }
+  .item .body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .item .meta { font-size: 12px; color: var(--muted); word-break: break-all; }
+  .item .meta a { color: var(--accent); }
+  .item .cap { font-size: 12px; color: #555; max-height: 3.6em; overflow: hidden; }
+  .item .show { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+  .item .show input { width: 18px; height: 18px; }
+  .item .ops { display: flex; gap: 4px; }
+  .item .ops button { padding: 3px 8px; font-size: 12px; }
+  .item input[type=text] { font-size: 12px; padding: 4px 6px; }
+  .badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #eef; color: #335; }
+  .readonly .needs-token { display: none; }
+  .srcbox h3 { font-size: 14px; margin: 0 0 6px; display: flex; align-items: center; gap: 8px; }
+  .adder { display: flex; gap: 6px; }
+  .adder input { flex: 1; }
+  .chips { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .chips li { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  .chips li a { color: #222; font-weight: 600; text-decoration: none; }
+  .chips li a:hover { text-decoration: underline; }
+  .chips li .st { font-size: 12px; color: var(--muted); flex: 1; }
+  .chips li .st.err { color: #c00; }
+  .chips li button { padding: 1px 8px; font-size: 12px; }
+  .chips .empty { border-style: dashed; color: var(--muted); justify-content: center; }
+  .off { opacity: .55; }
+  .count { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .count.over { color: #c00; font-weight: 600; }
+  .inline { display: flex !important; gap: 6px; align-items: center; color: #222 !important; font-size: 13px !important; margin: 6px 0 !important; }
+  .inline input[type=number] { width: 70px; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; font: inherit; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Instagram 表示管理</h1>
+  <button id="saveBtn" class="primary needs-token" disabled>保存（GitHubに反映）</button>
+  <span id="dirty" class="dirty" hidden>未保存の変更があります</span>
+  <span id="status" class="status"></span>
+  <span style="flex:1"></span>
+  <a id="previewLink" href="../embed.html" target="_blank">表示プレビュー ↗</a>
+</header>
+
+<main>
+  <section>
+    <details id="settingsBox">
+      <summary>接続設定（GitHub）</summary>
+      <div class="row">
+        <div><label>オーナー（ユーザー名/組織名）</label><input id="owner" type="text"></div>
+        <div><label>リポジトリ名</label><input id="repo" type="text"></div>
+        <div><label>ブランチ</label><input id="branch" type="text" value="main"></div>
+      </div>
+      <label>アクセストークン（Fine-grained token：このリポジトリの Contents を Read and write）</label>
+      <input id="token" type="password" autocomplete="off" placeholder="github_pat_...">
+      <p class="hint">「今すぐ収集を実行」も使う場合は、トークンに <b>Actions: Read and write</b> も付けてください。トークンはこのブラウザ内（localStorage）にだけ保存されます。共用PCでは使い終わったら「設定を消去」してください。トークンなしでも閲覧はできます（保存は不可）。</p>
+      <div class="row" style="margin-top:8px">
+        <div style="flex:0 0 auto"><button id="connectBtn" class="primary">接続して読み込み</button></div>
+        <div style="flex:0 0 auto"><button id="forgetBtn">設定を消去</button></div>
+      </div>
+    </details>
+  </section>
+
+  <section class="needs-token">
+    <h2>投稿を追加（URLを貼り付け）</h2>
+    <textarea id="addUrls" placeholder="https://www.instagram.com/p/XXXXXXXXXXX/&#10;https://www.instagram.com/reel/YYYYYYYYYYY/&#10;（1行に1件、複数可）"></textarea>
+    <div class="row" style="align-items:center;margin-top:8px">
+      <div style="flex:0 0 auto"><button id="addBtn">追加</button></div>
+      <div style="flex:0 0 auto"><label style="display:flex;gap:6px;align-items:center;margin:0;color:#222;font-size:14px"><input id="addApproved" type="checkbox" checked> 追加と同時に「表示する」にする</label></div>
+      <div><span id="addMsg" class="status"></span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>投稿一覧</h2>
+    <div class="tabs" id="tabs">
+      <button data-f="pending">未確認の候補</button>
+      <button data-f="approved" class="on">表示中</button>
+      <button data-f="all">すべて</button>
+    </div>
+    <p class="hint" id="orderHint">「表示中」タブの並び順がそのまま埋め込みの表示順になります（← → で入れ替え）。「除外」した投稿は自動収集でも再度追加されません。</p>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section id="srcSection">
+    <h2>自動収集の対象</h2>
+    <p class="hint" style="margin:0 0 10px">ここに登録したアカウント・ハッシュタグの新しい投稿を、毎日 6:17（日本時間）に「未確認の候補」へ追加します。変更したら「保存（GitHubに反映）」を押してください。収集には Instagram API の設定（README の手順5）が必要です。</p>
+    <div class="row">
+      <div class="srcbox">
+        <h3>アカウント <span class="count" id="userCount"></span></h3>
+        <div class="adder needs-token">
+          <input id="userIn" type="text" placeholder="ユーザー名 または プロフィールURL（カンマ区切りで複数可）">
+          <button id="userAdd">追加</button>
+        </div>
+        <ul class="chips" id="userList"></ul>
+        <p class="hint">取得できるのはビジネス／クリエイターアカウントの投稿のみです。個人アカウントは上の「投稿を追加」でURLを貼ってください。</p>
+      </div>
+      <div class="srcbox">
+        <h3>ハッシュタグ <span class="count" id="tagCount"></span></h3>
+        <label class="inline"><input id="tagEnabled" type="checkbox"> ハッシュタグ検索を有効にする（Meta の審査通過後）</label>
+        <div class="adder needs-token">
+          <input id="tagIn" type="text" placeholder="ハッシュタグ（# は不要、カンマ区切りで複数可）">
+          <button id="tagAdd">追加</button>
+        </div>
+        <ul class="chips" id="tagList"></ul>
+        <p class="hint">Instagram の制限で、検索できるのは7日間で30種類までです。</p>
+      </div>
+    </div>
+    <label class="inline">1つの対象から取得する件数 <input id="maxPer" type="number" min="1" max="50" step="1"> 件（最新順）</label>
+    <div class="row needs-token" style="align-items:center;margin-top:8px">
+      <div style="flex:0 0 auto"><button id="runBtn">今すぐ収集を実行</button></div>
+      <div><span id="runMsg" class="status"></span></div>
+    </div>
+    <p class="hint" id="lastRun"></p>
+    <p id="srcMsg" class="status"></p>
+  </section>
+</main>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const LS = 'igFeedAdmin';
+  const PATHS = { posts: 'data/posts.json', sources: 'data/sources.json', status: 'data/collect_status.json' };
+
+  const state = {
+    cfg: {}, posts: null, sources: null, status: null, sha: {}, dirty: false, filter: 'approved',
+    readonly: true,
+  };
+
+  // ---------- 設定 ----------
+  function loadCfg() {
+    try { state.cfg = JSON.parse(localStorage.getItem(LS) || '{}'); } catch (_) { state.cfg = {}; }
+    // GitHub Pages 上なら owner/repo を URL から推測
+    const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+    if (m && !state.cfg.owner) state.cfg.owner = m[1];
+    if (m && !state.cfg.repo) state.cfg.repo = location.pathname.split('/').filter(Boolean)[0] || '';
+    $('owner').value = state.cfg.owner || '';
+    $('repo').value = state.cfg.repo || '';
+    $('branch').value = state.cfg.branch || 'main';
+    $('token').value = state.cfg.token || '';
+  }
+  function saveCfg() {
+    state.cfg = { owner: $('owner').value.trim(), repo: $('repo').value.trim(), branch: $('branch').value.trim() || 'main', token: $('token').value.trim() };
+    try { localStorage.setItem(LS, JSON.stringify(state.cfg)); } catch (_) {}
+  }
+
+  function setStatus(msg, cls) { const s = $('status'); s.textContent = msg || ''; s.className = 'status ' + (cls || ''); }
+  function setDirty(v) {
+    state.dirty = v;
+    $('dirty').hidden = !v;
+    $('saveBtn').disabled = !v || state.readonly;
+  }
+  window.addEventListener('beforeunload', (e) => { if (state.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ---------- GitHub API ----------
+  const b64enc = (str) => { const bytes = new TextEncoder().encode(str); let bin = ''; bytes.forEach((b) => { bin += String.fromCharCode(b); }); return btoa(bin); };
+  const b64dec = (b64) => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\n/g, '')), (c) => c.charCodeAt(0)));
+
+  async function gh(path, opts = {}) {
+    const { owner, repo, token } = state.cfg;
+    const res = await fetch('https://api.github.com/repos/' + owner + '/' + repo + path, {
+      ...opts,
+      headers: { Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + token, 'X-GitHub-Api-Version': '2022-11-28', ...(opts.headers || {}) },
+    });
+    if (!res.ok) {
+      let msg = res.status + ' ' + res.statusText;
+      try { const j = await res.json(); if (j.message) msg += ' — ' + j.message; } catch (_) {}
+      const err = new Error(msg); err.status = res.status; throw err;
+    }
+    return res.status === 204 ? null : res.json();
+  }
+  async function ghRead(file) {
+    try {
+      const j = await gh('/contents/' + file + '?ref=' + encodeURIComponent(state.cfg.branch));
+      state.sha[file] = j.sha;
+      return JSON.parse(b64dec(j.content));
+    } catch (e) {
+      if (e.status === 404) { state.sha[file] = undefined; return null; }
+      throw e;
+    }
+  }
+  async function ghWrite(file, obj, message) {
+    const body = { message, content: b64enc(JSON.stringify(obj, null, 2) + '\n'), branch: state.cfg.branch };
+    if (state.sha[file]) body.sha = state.sha[file];
+    const j = await gh('/contents/' + file, { method: 'PUT', body: JSON.stringify(body) });
+    state.sha[file] = j.content.sha;
+  }
+
+  // ---------- 読み込み ----------
+  function normalize() {
+    state.posts = state.posts || {};
+    state.posts.posts = Array.isArray(state.posts.posts) ? state.posts.posts : [];
+    state.posts.dismissed = Array.isArray(state.posts.dismissed) ? state.posts.dismissed : [];
+    state.sources = state.sources || {};
+    state.sources.users = Array.isArray(state.sources.users) ? state.sources.users : [];
+    state.sources.hashtags = Array.isArray(state.sources.hashtags) ? state.sources.hashtags : [];
+    state.sources.hashtag_enabled = state.sources.hashtag_enabled === true;
+    const n = parseInt(state.sources.max_per_source, 10);
+    state.sources.max_per_source = n >= 1 && n <= 50 ? n : 12;
+  }
+
+  let loadSeq = 0;
+  async function load() {
+    const seq = ++loadSeq;
+    setStatus('読み込み中…');
+    const c = state.cfg;
+    state.readonly = !(c.owner && c.repo && c.token);
+    document.body.classList.toggle('readonly', state.readonly);
+    try {
+      let posts, sources, status;
+      if (state.readonly) {
+        const get = async (p) => { const r = await fetch('../' + p + '?t=' + Date.now()); return r.ok ? r.json() : null; };
+        posts = await get(PATHS.posts);
+        sources = await get(PATHS.sources);
+        status = await get(PATHS.status).catch(() => null);
+      } else {
+        posts = await ghRead(PATHS.posts);
+        sources = await ghRead(PATHS.sources);
+        status = await ghRead(PATHS.status).catch(() => null);
+      }
+      if (seq !== loadSeq) return; // 後から始まった読み込みを優先
+      state.posts = posts; state.sources = sources; state.status = status;
+      normalize();
+      setDirty(false);
+      render();
+      renderSources();
+      setStatus(state.readonly ? '閲覧モード（保存するには接続設定でトークンを入力）' : '読み込み完了', state.readonly ? '' : 'ok');
+      if (state.readonly) $('settingsBox').open = true;
+    } catch (e) {
+      if (seq !== loadSeq) return;
+      setStatus('読み込み失敗: ' + e.message, 'err');
+      $('settingsBox').open = true;
+    }
+  }
+
+  async function save() {
+    if (state.readonly) return;
+    $('saveBtn').disabled = true;
+    setStatus('保存中…');
+    try {
+      state.posts.updated_at = new Date().toISOString();
+      await ghWrite(PATHS.posts, state.posts, 'Update posts via admin');
+      await ghWrite(PATHS.sources, state.sources, 'Update sources via admin');
+      setDirty(false);
+      setStatus('保存しました（埋め込みへの反映まで1〜2分かかります）', 'ok');
+    } catch (e) {
+      if (e.status === 409 || e.status === 422) {
+        setStatus('保存できません：他で更新されています（自動収集など）。再読み込みしてからやり直してください。', 'err');
+      } else {
+        setStatus('保存失敗: ' + e.message, 'err');
+      }
+      $('saveBtn').disabled = false;
+    }
+  }
+
+  // ---------- URL解析 ----------
+  // 対応: instagram.com/p/CODE, /reel/CODE, /reels/CODE, /tv/CODE, /USERNAME/p/CODE, /USERNAME/reel/CODE
+  function parseUrl(s) {
+    s = s.trim();
+    if (!s) return null;
+    let u;
+    try { u = new URL(s.startsWith('http') ? s : 'https://' + s); } catch (_) { return null; }
+    if (!/(^|\.)instagram\.com$/.test(u.hostname)) return null;
+    const parts = u.pathname.split('/').filter(Boolean);
+    const i = parts.findIndex((p) => ['p', 'reel', 'reels', 'tv'].includes(p));
+    if (i < 0 || !parts[i + 1]) return null;
+    const code = parts[i + 1];
+    if (!/^[A-Za-z0-9_-]{5,}$/.test(code)) return null;
+    const type = parts[i] === 'p' ? 'p' : (parts[i] === 'tv' ? 'tv' : 'reel');
+    return { code, type, author: i === 1 ? parts[0] : '', url: 'https://www.instagram.com/' + type + '/' + code + '/' };
+  }
+
+  function addUrls() {
+    const lines = $('addUrls').value.split(/[\s,]+/);
+    const approved = $('addApproved').checked;
+    let added = 0, dup = 0, bad = 0;
+    const existing = new Set(state.posts.posts.map((p) => p.code));
+    const fresh = [];
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const r = parseUrl(line);
+      if (!r) { bad++; continue; }
+      if (existing.has(r.code)) { dup++; continue; }
+      existing.add(r.code);
+      state.posts.dismissed = state.posts.dismissed.filter((c) => c !== r.code);
+      fresh.push({ code: r.code, url: r.url, author: r.author, source: 'manual', added_at: new Date().toISOString(), approved, reviewed: approved, note: '' });
+      added++;
+    }
+    // 追加した投稿は先頭へ（貼り付けた順のまま）
+    state.posts.posts.unshift(...fresh);
+    $('addMsg').textContent = '追加 ' + added + ' 件' + (dup ? ' / 重複 ' + dup : '') + (bad ? ' / 認識できないURL ' + bad : '');
+    $('addMsg').className = 'status ' + (bad ? 'err' : 'ok');
+    if (added) { $('addUrls').value = ''; setDirty(true); render(); }
+  }
+
+  // ---------- 自動収集の対象 ----------
+  // ユーザー名: "name" / "@name" / "https://www.instagram.com/name/" を受け付ける
+  function parseUser(s) {
+    s = s.trim();
+    if (!s) return null;
+    if (/instagram\.com/i.test(s)) {
+      try {
+        const u = new URL(s.startsWith('http') ? s : 'https://' + s);
+        const first = u.pathname.split('/').filter(Boolean)[0] || '';
+        if (['p', 'reel', 'reels', 'tv', 'explore', 'stories'].includes(first)) return null;
+        s = first;
+      } catch (_) { return null; }
+    }
+    s = s.replace(/^@/, '').toLowerCase();
+    return /^[a-z0-9._]{1,30}$/.test(s) ? s : null;
+  }
+  // ハッシュタグ: "tag" / "#tag" / explore/tags/ のURL。日本語可
+  function parseTag(s) {
+    s = s.trim();
+    if (!s) return null;
+    const m = /instagram\.com\/explore\/tags\/([^/?#]+)/i.exec(s);
+    if (m) { try { s = decodeURIComponent(m[1]); } catch (_) { return null; } }
+    s = s.replace(/^#/, '').toLowerCase();
+    return /^[\p{L}\p{N}\p{M}_]{1,100}$/u.test(s) ? s : null;
+  }
+
+  function addSources(kind) {
+    const input = $(kind === 'user' ? 'userIn' : 'tagIn');
+    const list = kind === 'user' ? state.sources.users : state.sources.hashtags;
+    const parse = kind === 'user' ? parseUser : parseTag;
+    let added = 0, dup = 0; const bad = [];
+    for (const raw of input.value.split(/[\s,、]+/)) {
+      if (!raw.trim()) continue;
+      const v = parse(raw);
+      if (!v) { bad.push(raw); continue; }
+      if (list.includes(v)) { dup++; continue; }
+      list.push(v); added++;
+    }
+    const msg = [];
+    if (added) msg.push('追加 ' + added + ' 件');
+    if (dup) msg.push('登録済み ' + dup);
+    if (bad.length) msg.push('認識できません: ' + bad.join(' '));
+    $('srcMsg').textContent = msg.join(' / ');
+    $('srcMsg').className = 'status ' + (bad.length ? 'err' : 'ok');
+    if (added) { input.value = ''; setDirty(true); renderSources(); }
+  }
+
+  function statusFor(kind, name) {
+    const r = state.status && Array.isArray(state.status.results) && state.status.results.find((x) => x.kind === kind && x.name === name);
+    if (!r) return { text: state.status ? '前回の収集時は未登録' : '未収集', err: false };
+    if (r.skipped) return { text: '前回: スキップ（' + r.error + '）', err: false };
+    if (!r.ok) return { text: '前回: エラー — ' + r.error, err: true };
+    return { text: '前回: ' + r.fetched + ' 件取得 / 新規 ' + r.added + ' 件', err: false };
+  }
+
+  function renderChips(kind) {
+    const list = kind === 'user' ? state.sources.users : state.sources.hashtags;
+    const ul = $(kind === 'user' ? 'userList' : 'tagList');
+    const off = kind === 'tag' && !state.sources.hashtag_enabled;
+    if (!list.length) { ul.innerHTML = '<li class="empty">' + (kind === 'user' ? 'アカウント' : 'ハッシュタグ') + 'は未登録です</li>'; return; }
+    ul.innerHTML = list.map((name, i) => {
+      const st = statusFor(kind, name);
+      const href = kind === 'user' ? 'https://www.instagram.com/' + encodeURIComponent(name) + '/' : 'https://www.instagram.com/explore/tags/' + encodeURIComponent(name) + '/';
+      return '<li class="' + (off ? 'off' : '') + '" data-kind="' + kind + '" data-i="' + i + '">' +
+        '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + (kind === 'user' ? '@' : '#') + esc(name) + '</a>' +
+        '<span class="st ' + (st.err ? 'err' : '') + '">' + esc(st.text) + '</span>' +
+        '<button class="needs-token" data-act="rmsrc" title="対象から外す">削除</button></li>';
+    }).join('');
+  }
+
+  function renderSources() {
+    const s = state.sources;
+    renderChips('user');
+    renderChips('tag');
+    $('userCount').textContent = s.users.length + ' 件';
+    $('tagCount').textContent = s.hashtags.length + ' / 30';
+    $('tagCount').classList.toggle('over', s.hashtags.length > 30);
+    $('tagEnabled').checked = s.hashtag_enabled;
+    $('maxPer').value = s.max_per_source;
+    ['tagEnabled', 'maxPer'].forEach((id) => { $(id).disabled = state.readonly; });
+    const st = state.status;
+    $('lastRun').textContent = st && st.ran_at
+      ? '前回の収集: ' + new Date(st.ran_at).toLocaleString('ja-JP') + '（新しい候補 ' + (st.added || 0) + ' 件）'
+      : 'まだ収集は実行されていません。';
+  }
+
+  ['userList', 'tagList'].forEach((id) => $(id).addEventListener('click', (e) => {
+    if (e.target.dataset.act !== 'rmsrc') return;
+    const li = e.target.closest('li');
+    const list = li.dataset.kind === 'user' ? state.sources.users : state.sources.hashtags;
+    list.splice(Number(li.dataset.i), 1);
+    setDirty(true); renderSources();
+  }));
+  $('userAdd').addEventListener('click', () => addSources('user'));
+  $('tagAdd').addEventListener('click', () => addSources('tag'));
+  $('userIn').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) addSources('user'); });
+  $('tagIn').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) addSources('tag'); });
+  $('tagEnabled').addEventListener('change', (e) => { state.sources.hashtag_enabled = e.target.checked; setDirty(true); renderSources(); });
+  $('maxPer').addEventListener('change', (e) => {
+    const n = parseInt(e.target.value, 10);
+    state.sources.max_per_source = Number.isFinite(n) ? Math.min(50, Math.max(1, n)) : 12;
+    setDirty(true); renderSources();
+  });
+
+  async function runCollect() {
+    if (state.dirty) { $('runMsg').textContent = '先に「保存（GitHubに反映）」してから実行してください。'; $('runMsg').className = 'status err'; return; }
+    $('runBtn').disabled = true;
+    $('runMsg').textContent = '実行を依頼中…'; $('runMsg').className = 'status';
+    try {
+      await gh('/actions/workflows/collect.yml/dispatches', { method: 'POST', body: JSON.stringify({ ref: state.cfg.branch }) });
+      $('runMsg').textContent = '実行を開始しました。数分後に「接続して読み込み」で結果を確認できます。';
+      $('runMsg').className = 'status ok';
+    } catch (e) {
+      $('runMsg').textContent = (e.status === 403 || e.status === 404)
+        ? '実行できません：トークンに「Actions: Read and write」権限を追加してください。'
+        : '実行失敗: ' + e.message;
+      $('runMsg').className = 'status err';
+    }
+    $('runBtn').disabled = false;
+  }
+  $('runBtn').addEventListener('click', runCollect);
+
+  // ---------- 一覧表示 ----------
+  const previewIO = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      previewIO.unobserve(e.target);
+      const f = document.createElement('iframe');
+      f.src = 'https://www.instagram.com/p/' + encodeURIComponent(e.target.dataset.code) + '/embed/';
+      f.loading = 'lazy';
+      f.setAttribute('scrolling', 'no');
+      e.target.replaceChildren(f);
+    });
+  }, { rootMargin: '300px' });
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+  function visiblePosts() {
+    const all = state.posts.posts;
+    if (state.filter === 'approved') return all.filter((p) => p.approved);
+    if (state.filter === 'pending') return all.filter((p) => !p.approved && !p.reviewed);
+    return all;
+  }
+
+  function render() {
+    const grid = $('grid');
+    const list = visiblePosts();
+    const counts = {
+      approved: state.posts.posts.filter((p) => p.approved).length,
+      pending: state.posts.posts.filter((p) => !p.approved && !p.reviewed).length,
+      all: state.posts.posts.length,
+    };
+    document.querySelectorAll('#tabs button').forEach((b) => {
+      const label = { approved: '表示中', pending: '未確認の候補', all: 'すべて' }[b.dataset.f];
+      b.textContent = label + ' (' + counts[b.dataset.f] + ')';
+      b.classList.toggle('on', b.dataset.f === state.filter);
+    });
+    $('orderHint').hidden = state.filter !== 'approved';
+    if (!list.length) { grid.innerHTML = '<p class="hint">該当する投稿はありません。</p>'; return; }
+    const ro = state.readonly ? 'disabled' : '';
+    grid.innerHTML = list.map((p, idx) => `
+      <div class="item ${p.approved ? 'approved' : ''}" data-code="${esc(p.code)}">
+        <div class="pv" data-code="${esc(p.code)}"><div class="ph">プレビュー読み込み中…</div></div>
+        <div class="body">
+          <label class="show" style="margin:0;color:#222;font-size:14px"><input type="checkbox" data-act="toggle" ${p.approved ? 'checked' : ''} ${ro}> 表示する</label>
+          <div class="meta">
+            ${p.author ? '@' + esc(p.author) + ' · ' : ''}<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.code)}</a>
+            <span class="badge">${esc(sourceLabel(p.source))}</span>
+            ${p.posted_at ? '<br>投稿 ' + esc(p.posted_at.slice(0, 10)) : ''}
+          </div>
+          ${p.caption ? '<div class="cap">' + esc(p.caption) + '</div>' : ''}
+          <input type="text" data-act="note" placeholder="メモ（管理用・表示されません）" value="${esc(p.note)}" ${ro}>
+          <div class="ops needs-token">
+            ${state.filter === 'approved' ? `<button data-act="up" ${idx === 0 ? 'disabled' : ''} title="前へ">←</button><button data-act="down" ${idx === list.length - 1 ? 'disabled' : ''} title="後ろへ">→</button>` : ''}
+            ${!p.approved && !p.reviewed ? '<button data-act="skip" title="表示せず確認済みにする">見送り</button>' : ''}
+            <span style="flex:1"></span>
+            <button data-act="dismiss" title="一覧から消し、自動収集でも再追加しない">除外</button>
+          </div>
+        </div>
+      </div>`).join('');
+    grid.querySelectorAll('.pv').forEach((el) => previewIO.observe(el));
+  }
+
+  function sourceLabel(s) {
+    if (!s || s === 'manual') return '手動';
+    if (s.startsWith('user:')) return '@' + s.slice(5);
+    if (s.startsWith('tag:')) return '#' + s.slice(4);
+    return s;
+  }
+
+  $('grid').addEventListener('change', (e) => {
+    const item = e.target.closest('.item'); if (!item) return;
+    const p = state.posts.posts.find((x) => x.code === item.dataset.code); if (!p) return;
+    if (e.target.dataset.act === 'toggle') {
+      p.approved = e.target.checked;
+      p.reviewed = true;
+      setDirty(true);
+      render();
+    }
+  });
+  $('grid').addEventListener('input', (e) => {
+    if (e.target.dataset.act !== 'note') return;
+    const item = e.target.closest('.item');
+    const p = state.posts.posts.find((x) => x.code === item.dataset.code);
+    if (p) { p.note = e.target.value; setDirty(true); }
+  });
+  $('grid').addEventListener('click', (e) => {
+    const act = e.target.dataset && e.target.dataset.act;
+    if (!act || !['up', 'down', 'skip', 'dismiss'].includes(act)) return;
+    const item = e.target.closest('.item');
+    const arr = state.posts.posts;
+    const i = arr.findIndex((x) => x.code === item.dataset.code);
+    if (i < 0) return;
+    if (act === 'skip') { arr[i].reviewed = true; }
+    if (act === 'dismiss') {
+      if (!confirm('この投稿を除外しますか？（自動収集でも再追加されなくなります）')) return;
+      state.posts.dismissed.push(arr[i].code);
+      arr.splice(i, 1);
+    }
+    if (act === 'up' || act === 'down') {
+      // 表示中の投稿同士で入れ替える（配列上の位置を交換）
+      const approvedIdx = arr.map((p, k) => (p.approved ? k : -1)).filter((k) => k >= 0);
+      const pos = approvedIdx.indexOf(i);
+      const j = approvedIdx[act === 'up' ? pos - 1 : pos + 1];
+      if (j === undefined) return;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    setDirty(true);
+    render();
+  });
+
+  $('tabs').addEventListener('click', (e) => {
+    if (!e.target.dataset.f) return;
+    state.filter = e.target.dataset.f;
+    render();
+  });
+
+  $('connectBtn').addEventListener('click', () => {
+    if (state.dirty && !confirm('未保存の変更は破棄されます。読み込み直しますか？')) return;
+    saveCfg(); load();
+  });
+  $('forgetBtn').addEventListener('click', () => {
+    try { localStorage.removeItem(LS); } catch (_) {}
+    $('token').value = '';
+    saveCfg(); try { localStorage.removeItem(LS); } catch (_) {}
+    setStatus('設定を消去しました');
+    load();
+  });
+  $('addBtn').addEventListener('click', addUrls);
+  $('saveBtn').addEventListener('click', save);
+
+  loadCfg();
+  load();
+})();
+</script>
+</body>
+</html>

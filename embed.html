@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Instagram Feed</title>
+<style>
+  :root {
+    --card-w: 326px;   /* ?w= で変更 */
+    --gap: 16px;
+    --bg: transparent; /* ?bg= で変更（例 bg=ffffff） */
+  }
+  html, body { margin: 0; background: var(--bg); font-family: system-ui, -apple-system, "Hiragino Sans", sans-serif; }
+  .wrap { position: relative; }
+  .track {
+    display: flex; align-items: flex-start; gap: var(--gap);
+    overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x mandatory; scroll-behavior: smooth; scroll-padding-inline: 16px;
+    padding: 8px 16px 14px;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .card {
+    flex: 0 0 var(--card-w); scroll-snap-align: start;
+    background: #fff; border-radius: 8px; overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  }
+  .card iframe { display: block; width: 100%; border: 0; height: 480px; background: #fafafa; }
+  .card .ph {
+    height: 480px; display: flex; align-items: center; justify-content: center;
+    color: #aaa; font-size: 13px; background: #fafafa;
+  }
+  .nav {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+    width: 40px; height: 40px; border-radius: 50%; border: 0;
+    background: rgba(0,0,0,.55); color: #fff; font-size: 22px; line-height: 40px;
+    cursor: pointer; padding: 0;
+  }
+  .nav:hover { background: rgba(0,0,0,.75); }
+  .prev { left: 4px; } .next { right: 4px; }
+  .nav[hidden] { display: none; }
+  .empty { padding: 24px; color: #888; text-align: center; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <button class="nav prev" type="button" aria-label="前へ" hidden>&#8249;</button>
+  <div class="track" id="track"></div>
+  <button class="nav next" type="button" aria-label="次へ" hidden>&#8250;</button>
+</div>
+
+<script>
+/*
+ * 承認済み（approved: true）の投稿だけを横スクロールで表示する埋め込みページ。
+ * 表示は Instagram 公式の埋め込み（/p/{code}/embed/）を使う。
+ *
+ * URLパラメータ:
+ *   w=326        カード幅(px)
+ *   caption=1    キャプション付きで表示
+ *   auto=5       5秒ごとに自動スクロール（0で無効）
+ *   max=30       表示する最大件数
+ *   bg=ffffff    背景色（16進、#なし）
+ *   data=...     posts.json の場所（通常は不要）
+ */
+(function () {
+  const q = new URLSearchParams(location.search);
+  const cardW = parseInt(q.get('w') || '326', 10);
+  const caption = q.get('caption') === '1';
+  const autoSec = parseFloat(q.get('auto') || '0');
+  const max = parseInt(q.get('max') || '50', 10);
+  const dataUrl = q.get('data') || 'data/posts.json';
+  if (q.get('bg')) document.documentElement.style.setProperty('--bg', '#' + q.get('bg').replace(/[^0-9a-fA-F]/g, ''));
+  document.documentElement.style.setProperty('--card-w', cardW + 'px');
+
+  const track = document.getElementById('track');
+  const prev = document.querySelector('.prev');
+  const next = document.querySelector('.next');
+
+  function embedSrc(code) {
+    return 'https://www.instagram.com/p/' + encodeURIComponent(code) + '/embed/' + (caption ? 'captioned/' : '');
+  }
+
+  // 画面に近づいたカードから iframe を読み込む
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      const card = e.target;
+      io.unobserve(card);
+      const f = document.createElement('iframe');
+      f.src = embedSrc(card.dataset.code);
+      f.title = 'Instagram post';
+      f.setAttribute('scrolling', 'no');
+      f.setAttribute('allowtransparency', 'true');
+      f.setAttribute('allow', 'encrypted-media');
+      card.replaceChildren(f);
+    });
+  }, { root: track, rootMargin: '0px ' + (cardW * 2) + 'px' });
+
+  // 公式埋め込みが送ってくる高さ情報で iframe の高さを合わせる
+  window.addEventListener('message', (ev) => {
+    if (!/^https:\/\/(www\.)?instagram\.com$/.test(ev.origin)) return;
+    let d = ev.data;
+    if (typeof d === 'string') { try { d = JSON.parse(d); } catch (_) { return; } }
+    if (!d || d.type !== 'MEASURE' || !d.details || !d.details.height) return;
+    for (const f of track.querySelectorAll('iframe')) {
+      if (f.contentWindow === ev.source) { f.style.height = Math.ceil(d.details.height) + 'px'; break; }
+    }
+  });
+
+  function step() { return cardW + 16; }
+  function updateNav() {
+    const maxScroll = track.scrollWidth - track.clientWidth;
+    prev.hidden = track.scrollLeft <= 4;
+    next.hidden = track.scrollLeft >= maxScroll - 4;
+  }
+  prev.addEventListener('click', () => track.scrollBy({ left: -step() }));
+  next.addEventListener('click', () => track.scrollBy({ left: step() }));
+  track.addEventListener('scroll', updateNav, { passive: true });
+  window.addEventListener('resize', updateNav);
+
+  // 自動スクロール（マウスが乗っている間・タッチ操作中は止める）
+  let paused = false;
+  ['mouseenter', 'touchstart', 'focusin'].forEach((t) => track.parentElement.addEventListener(t, () => { paused = true; }, { passive: true }));
+  ['mouseleave', 'touchend', 'focusout'].forEach((t) => track.parentElement.addEventListener(t, () => { paused = false; }, { passive: true }));
+  if (autoSec > 0) {
+    setInterval(() => {
+      if (paused || document.hidden) return;
+      const maxScroll = track.scrollWidth - track.clientWidth;
+      if (track.scrollLeft >= maxScroll - 4) track.scrollTo({ left: 0 });
+      else track.scrollBy({ left: step() });
+    }, autoSec * 1000);
+  }
+
+  fetch(dataUrl + (dataUrl.includes('?') ? '&' : '?') + 't=' + Date.now())
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((data) => {
+      const posts = (data.posts || []).filter((p) => p.approved && p.code).slice(0, max);
+      if (!posts.length) {
+        track.innerHTML = '<div class="empty">表示する投稿がありません</div>';
+        return;
+      }
+      posts.forEach((p) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.code = p.code;
+        card.innerHTML = '<div class="ph">読み込み中…</div>';
+        track.appendChild(card);
+        io.observe(card);
+      });
+      updateNav();
+    })
+    .catch((e) => {
+      track.innerHTML = '<div class="empty">読み込みに失敗しました (' + e.message + ')</div>';
+    });
+})();
+</script>
+</body>
+</html>
