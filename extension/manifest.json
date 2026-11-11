@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Instagram Feed ピッカー",
+  "version": "1.0.0",
+  "description": "Instagram の画面で投稿を選ぶと、Instagram Feed（GitHub Pages）の表示リストに保存します。",
+  "permissions": ["storage"],
+  "host_permissions": ["https://api.github.com/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.instagram.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": { "default_title": "Instagram Feed ピッカー", "default_popup": "popup.html" },
+  "options_page": "options.html"
+}

@@ -125,7 +125,7 @@
     <h2>アカウント<span class="tag">API不要</span></h2>
     <p class="ro-note">編集するには、上の「接続設定」でトークンを入力して接続してください。</p>
     <p class="hint" style="margin:0 0 10px">登録したアカウントの最新投稿が、下の「投稿を選んで追加」に並びます。公開アカウントならビジネス／個人を問わず使えます（非公開アカウントは表示されません）。</p>
-    <label class="inline"><input id="showProfiles" type="checkbox"> 埋め込みの先頭に、アカウントの枠（プロフィールと最新6件）も表示する</label>
+    <label class="inline"><input id="showProfiles" type="checkbox"> 埋め込みの先頭に、アカウントの枠（プロフィールと最新6件）も表示する（通常はオフ）</label>
     <div class="adder needs-token">
       <input id="profIn" type="text" placeholder="ユーザー名 または プロフィールURL（カンマ区切りで複数可）">
       <button id="profAdd">追加</button>
@@ -137,16 +137,15 @@
   <section class="needs-token" id="pickSection">
     <h2>投稿を選ぶ<span class="tag">API不要</span></h2>
     <div class="setup">
-      <b>はじめに1回だけ：</b>このボタンを、ブラウザのブックマークバーへドラッグしてください →
-      <a class="bm" id="bmLink" href="#" title="ブックマークバーへドラッグ">📌 投稿を選ぶ</a>
-      <p>ブックマークバーが見えないときは <b>⌘ + Shift + B</b>（Windows は Ctrl + Shift + B）で表示できます。パソコンのブラウザ用です（スマホでは使えません）。</p>
+      <b>おすすめ：Chrome 拡張「Instagram Feed ピッカー」</b>
+      <p>Instagram の画面の写真に「＋」ボタンが付き、押すだけで選べます（選んだ写真は緑の枠と ✓）。投稿を開いているときは右下の「＋ この投稿を選ぶ」。保存も自動です。入れ方は README の「Chrome 拡張」を参照してください。</p>
     </div>
-    <ol class="steps">
-      <li>下のアカウント一覧でサムネイルをクリック（Instagram が新しいタブで、大きな画面・本文付きで開きます）。Instagram で直接探して投稿を開いてもかまいません</li>
-      <li>気に入った投稿を開いたまま、ブックマークバーの「📌 投稿を選ぶ」を押す</li>
-      <li>小窓に「選びました ✓」と出れば完了です（保存も自動。この画面の「選択中」にも自動で反映されます）</li>
-    </ol>
+    <p class="hint" style="margin:0 0 8px">下のアカウント一覧のサムネイルをクリックすると、Instagram がその投稿を開きます。</p>
     <div class="picker" id="picker"></div>
+    <details style="margin-bottom:8px">
+      <summary style="font-weight:400;font-size:13px">拡張を使わない方法（ブックマークで選ぶ）</summary>
+      <p class="hint">このボタンをブックマークバーへドラッグ → <a class="bm" id="bmLink" href="#" title="ブックマークバーへドラッグ">📌 投稿を選ぶ</a>　Instagram で投稿を開いた状態で押すと、小窓で選択・保存します。</p>
+    </details>
     <details>
       <summary style="font-weight:400;font-size:13px">URLを貼り付けて追加する</summary>
     <textarea id="addUrls" placeholder="https://www.instagram.com/p/XXXXXXXXXXX/&#10;https://www.instagram.com/reel/YYYYYYYYYYY/&#10;（1行に1件、複数可）"></textarea>
@@ -294,7 +293,7 @@
     state.posts.posts = Array.isArray(state.posts.posts) ? state.posts.posts : [];
     state.posts.dismissed = Array.isArray(state.posts.dismissed) ? state.posts.dismissed : [];
     state.posts.profiles = Array.isArray(state.posts.profiles) ? state.posts.profiles : [];
-    state.posts.show_profiles = state.posts.show_profiles !== false;
+    state.posts.show_profiles = state.posts.show_profiles === true;
     state.sources = state.sources || {};
     state.sources.users = Array.isArray(state.sources.users) ? state.sources.users : [];
     state.sources.hashtags = Array.isArray(state.sources.hashtags) ? state.sources.hashtags : [];
@@ -804,6 +803,14 @@
       load();
     };
   } catch (_) {}
+
+  // Chrome 拡張で選んだ分を反映するため、この画面に戻ってきたら読み直す（未保存の変更が無いときだけ）
+  let lastFocusLoad = 0;
+  window.addEventListener('focus', () => {
+    if (state.dirty || !$('modal').hidden || Date.now() - lastFocusLoad < 5000) return;
+    lastFocusLoad = Date.now();
+    load();
+  });
 
   loadCfg();
   load();

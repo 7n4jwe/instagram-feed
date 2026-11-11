@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: system-ui, -apple-system, "Hiragino Sans", sans-serif; font-size: 13px; color: #222; width: 260px; margin: 0; padding: 14px; }
+  .count { font-size: 15px; font-weight: 700; margin: 0 0 10px; }
+  .err { color: #c00; }
+  a.btn { display: block; text-align: center; text-decoration: none; padding: 8px; margin: 6px 0; border-radius: 6px; border: 1px solid #ccc; color: #222; }
+  a.btn.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  .hint { color: #777; font-size: 12px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<p id="count" class="count">読み込み中…</p>
+<p class="hint">Instagram の投稿やプロフィールの一覧で、写真の左上の「＋」を押すと選べます。</p>
+<a class="btn primary" id="embed" target="_blank" href="#">表示を確認</a>
+<a class="btn" id="admin" target="_blank" href="#">管理画面（並べ替えなど）</a>
+<a class="btn" id="opts" href="#">設定</a>
+<script src="popup.js"></script>
+</body>
+</html>

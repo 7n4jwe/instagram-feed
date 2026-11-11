@@ -6,8 +6,9 @@
 <title>Instagram Feed</title>
 <style>
   :root {
-    --card-w: 326px;   /* ?w= で変更 */
-    --gap: 16px;
+    --size: 240px;     /* ?size= で変更（写真の一辺） */
+    --card-w: 326px;   /* ?w= で変更（アカウント枠の幅） */
+    --gap: 12px;
     --bg: transparent; /* ?bg= で変更（例 bg=ffffff） */
   }
   html, body { margin: 0; background: var(--bg); font-family: system-ui, -apple-system, "Hiragino Sans", sans-serif; }
@@ -15,21 +16,38 @@
   .track {
     display: flex; align-items: flex-start; gap: var(--gap);
     overflow-x: auto; overflow-y: hidden;
-    scroll-snap-type: x mandatory; scroll-behavior: smooth; scroll-padding-inline: 16px;
-    padding: 8px 16px 14px;
+    scroll-snap-type: x mandatory; scroll-behavior: smooth; scroll-padding-inline: 12px;
+    padding: 8px 12px 12px;
     scrollbar-width: thin;
     -webkit-overflow-scrolling: touch;
   }
+  /* 写真だけのサムネイル：公式埋め込みのヘッダー部分を隠して写真の部分だけを見せる */
+  .thumb {
+    flex: 0 0 var(--size); width: var(--size); height: var(--size);
+    position: relative; overflow: hidden; scroll-snap-align: start;
+    border-radius: 8px; background: #eee; cursor: pointer;
+  }
+  .thumb iframe {
+    position: absolute; top: -56px; left: -1px; border: 0;
+    width: calc(var(--size) + 2px); height: calc(var(--size) * 1.6 + 120px);
+    pointer-events: none;
+  }
+  .thumb .hit { position: absolute; inset: 0; border: 0; padding: 0; margin: 0; background: transparent; cursor: pointer; z-index: 1; }
+  .thumb .hit:hover { background: rgba(0,0,0,.08); }
+  .thumb .hit:focus-visible { outline: 3px solid #1f6feb; outline-offset: -3px; }
+  .thumb .who {
+    position: absolute; left: 6px; bottom: 6px; z-index: 1; pointer-events: none;
+    max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 11px; color: #fff; background: rgba(0,0,0,.5); padding: 2px 7px; border-radius: 10px;
+  }
+  .thumb .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 12px; }
   .card {
     flex: 0 0 var(--card-w); scroll-snap-align: start;
     background: #fff; border-radius: 8px; overflow: hidden;
     box-shadow: 0 1px 3px rgba(0,0,0,.15);
   }
-  .card iframe { display: block; width: 100%; border: 0; height: 480px; background: #fafafa; }
-  .card .ph {
-    height: 480px; display: flex; align-items: center; justify-content: center;
-    color: #aaa; font-size: 13px; background: #fafafa;
-  }
+  .card iframe { display: block; width: 100%; border: 0; background: #fafafa; }
+  .card .ph { display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 13px; background: #fafafa; }
   .nav {
     position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
     width: 40px; height: 40px; border-radius: 50%; border: 0;
@@ -40,6 +58,16 @@
   .prev { left: 4px; } .next { right: 4px; }
   .nav[hidden] { display: none; }
   .empty { padding: 24px; color: #888; text-align: center; font-size: 14px; }
+
+  /* 詳細（クリックで開く） */
+  .modal { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.72); overflow-y: auto; }
+  .modal[hidden] { display: none; }
+  .modal .box { position: relative; width: min(540px, calc(100% - 24px)); margin: 12px auto; background: #fff; border-radius: 8px; overflow: hidden; }
+  .modal .bar { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: #fff; border-bottom: 1px solid #eee; }
+  .modal .bar button { width: 34px; height: 34px; border: 0; border-radius: 50%; background: #f1f1f1; font-size: 18px; cursor: pointer; }
+  .modal .bar button:disabled { opacity: .35; cursor: default; }
+  .modal .bar a { flex: 1; text-align: center; font-size: 12px; color: #1f6feb; text-decoration: none; }
+  .modal iframe { display: block; width: 100%; height: 700px; border: 0; }
 </style>
 </head>
 <body>
@@ -49,74 +77,140 @@
   <button class="nav next" type="button" aria-label="次へ" hidden>&#8250;</button>
 </div>
 
+<div class="modal" id="modal" hidden>
+  <div class="box">
+    <div class="bar">
+      <button type="button" id="mPrev" aria-label="前の投稿">&#8249;</button>
+      <a id="mOpen" href="#" target="_blank" rel="noopener">Instagram で見る ↗</a>
+      <button type="button" id="mNext" aria-label="次の投稿">&#8250;</button>
+      <button type="button" id="mClose" aria-label="閉じる">&times;</button>
+    </div>
+    <iframe id="mFrame" title="Instagram post" scrolling="no" allow="encrypted-media"></iframe>
+  </div>
+</div>
+
 <script>
 /*
- * 登録したアカウント（profiles）と、承認済み（approved: true）の投稿を横スクロールで表示する埋め込みページ。
- * 表示は Instagram 公式の埋め込みを使う（アカウント: /{username}/embed/、投稿: /p/{code}/embed/）。
- * アカウントの埋め込みは API 不要で、そのアカウントの最新投稿（6件）が自動で更新される。
+ * 選んだ投稿（approved: true）を「写真だけ」横スクロールで並べ、クリックで詳細（本文付きの公式埋め込み）を開く。
+ * 写真のサムネイルは公式埋め込み（/p/{code}/embed/）のヘッダーを隠したもの。画像をコピーしないので、
+ * 投稿者が削除・非公開にすると自動的に表示されなくなる。
  *
  * URLパラメータ:
- *   w=326        カード幅(px)
- *   caption=1    キャプション付きで表示
+ *   size=240     写真の一辺(px)
  *   auto=5       5秒ごとに自動スクロール（0で無効）
- *   max=30       表示する最大件数
+ *   max=50       表示する最大件数
  *   bg=ffffff    背景色（16進、#なし）
- *   user=a,b     表示するアカウントを直接指定（posts.json の profiles より優先）
- *   posts=0      個別の投稿を表示しない（アカウントだけ表示）
+ *   who=0        写真の上の「@投稿者名」を出さない
+ *   detail=link  クリックで詳細を開かず、Instagram の投稿ページを新しいタブで開く
+ *   w=326        アカウント枠の幅（アカウント枠を表示するときのみ）
+ *   user=a,b     表示するアカウント枠を直接指定（posts.json の profiles より優先）
+ *   posts=0      個別の投稿を表示しない（アカウント枠だけ表示）
  *   data=...     posts.json の場所（通常は不要）
+ *
+ * 詳細はこの埋め込みの枠の中に開くので、サイト側の iframe の高さが低いと詳細も小さくなる
+ * （詳細内はスクロールできる）。枠を低くしたい場合は detail=link を使う。
  */
 (function () {
   const q = new URLSearchParams(location.search);
-  const cardW = parseInt(q.get('w') || '326', 10);
-  const caption = q.get('caption') === '1';
+  const num = (k, d) => { const n = parseInt(q.get(k), 10); return Number.isFinite(n) && n > 0 ? n : d; };
+  const size = Math.min(600, Math.max(120, num('size', 240)));
+  const cardW = num('w', 326);
   const autoSec = parseFloat(q.get('auto') || '0');
-  const max = parseInt(q.get('max') || '50', 10);
+  const max = num('max', 50);
+  const showWho = q.get('who') !== '0';
+  const detailLink = q.get('detail') === 'link';
   const dataUrl = q.get('data') || 'data/posts.json';
   const userParam = q.get('user');
   const showPosts = q.get('posts') !== '0';
-  // アカウント埋め込みは高さを通知してこないので、幅から計算（ヘッダー＋3列×2段のサムネイル）
+  // アカウント埋め込みの高さ（ヘッダー＋3列×2段のサムネイル）。MEASURE が来ればそちらを使う
   const profileH = Math.round(cardW * 2 / 3 + 152);
   if (q.get('bg')) document.documentElement.style.setProperty('--bg', '#' + q.get('bg').replace(/[^0-9a-fA-F]/g, ''));
+  document.documentElement.style.setProperty('--size', size + 'px');
   document.documentElement.style.setProperty('--card-w', cardW + 'px');
 
-  const track = document.getElementById('track');
+  const $ = (id) => document.getElementById(id);
+  const track = $('track');
   const prev = document.querySelector('.prev');
   const next = document.querySelector('.next');
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let posts = [];
 
-  function embedSrc(card) {
-    if (card.dataset.user) return 'https://www.instagram.com/' + encodeURIComponent(card.dataset.user) + '/embed/';
-    return 'https://www.instagram.com/p/' + encodeURIComponent(card.dataset.code) + '/embed/' + (caption ? 'captioned/' : '');
-  }
-
-  // 画面に近づいたカードから iframe を読み込む
+  // 画面に近づいたものから iframe を読み込む
   const io = new IntersectionObserver((entries) => {
     entries.forEach((e) => {
       if (!e.isIntersecting) return;
-      const card = e.target;
-      io.unobserve(card);
+      const el = e.target;
+      io.unobserve(el);
       const f = document.createElement('iframe');
-      f.src = embedSrc(card);
-      f.title = card.dataset.user ? 'Instagram @' + card.dataset.user : 'Instagram post';
-      if (card.dataset.user) f.style.height = profileH + 'px';
       f.setAttribute('scrolling', 'no');
-      f.setAttribute('allowtransparency', 'true');
-      f.setAttribute('allow', 'encrypted-media');
-      card.replaceChildren(f);
+      f.setAttribute('tabindex', '-1');
+      if (el.dataset.user) {
+        f.src = 'https://www.instagram.com/' + encodeURIComponent(el.dataset.user) + '/embed/';
+        f.title = 'Instagram @' + el.dataset.user;
+        f.style.height = profileH + 'px';
+        el.replaceChildren(f);
+      } else {
+        f.src = 'https://www.instagram.com/p/' + encodeURIComponent(el.dataset.code) + '/embed/';
+        f.title = '';
+        f.setAttribute('aria-hidden', 'true');
+        el.querySelector('.ph').replaceWith(f);
+      }
     });
-  }, { root: track, rootMargin: '0px ' + (cardW * 2) + 'px' });
+  }, { root: track, rootMargin: '0px ' + (size * 3) + 'px' });
 
-  // 公式埋め込みが送ってくる高さ情報で iframe の高さを合わせる
+  // 詳細とアカウント枠は、公式埋め込みが送ってくる高さに合わせる（写真サムネイルは固定）
   window.addEventListener('message', (ev) => {
     if (!/^https:\/\/(www\.)?instagram\.com$/.test(ev.origin)) return;
     let d = ev.data;
     if (typeof d === 'string') { try { d = JSON.parse(d); } catch (_) { return; } }
     if (!d || d.type !== 'MEASURE' || !d.details || !d.details.height) return;
-    for (const f of track.querySelectorAll('iframe')) {
+    for (const f of document.querySelectorAll('#mFrame, .card iframe')) {
       if (f.contentWindow === ev.source) { f.style.height = Math.ceil(d.details.height) + 'px'; break; }
     }
   });
 
-  function step() { return cardW + 16; }
+  // ---------- 詳細 ----------
+  let cur = -1;
+  function openDetail(i) {
+    const p = posts[i]; if (!p) return;
+    if (detailLink) { window.open(p.url || 'https://www.instagram.com/p/' + p.code + '/', '_blank', 'noopener'); return; }
+    cur = i;
+    $('mFrame').style.height = '700px';
+    $('mFrame').src = 'https://www.instagram.com/p/' + encodeURIComponent(p.code) + '/embed/captioned/';
+    $('mOpen').href = p.url || 'https://www.instagram.com/p/' + p.code + '/';
+    $('mPrev').disabled = i <= 0;
+    $('mNext').disabled = i >= posts.length - 1;
+    const wasHidden = $('modal').hidden;
+    $('modal').hidden = false;
+    $('modal').scrollTop = 0;
+    paused = true;
+    if (wasHidden) $('mClose').focus();
+  }
+  function closeDetail() {
+    $('modal').hidden = true;
+    $('mFrame').src = 'about:blank';
+    paused = false;
+    const t = track.querySelector('.thumb[data-i="' + cur + '"] .hit');
+    if (t) t.focus({ preventScroll: true });
+    cur = -1;
+  }
+  $('mPrev').addEventListener('click', () => openDetail(cur - 1));
+  $('mNext').addEventListener('click', () => openDetail(cur + 1));
+  $('mClose').addEventListener('click', closeDetail);
+  $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) closeDetail(); });
+  document.addEventListener('keydown', (e) => {
+    if ($('modal').hidden) return;
+    if (e.key === 'Escape') closeDetail();
+    if (e.key === 'ArrowLeft' && cur > 0) openDetail(cur - 1);
+    if (e.key === 'ArrowRight' && cur < posts.length - 1) openDetail(cur + 1);
+  });
+  track.addEventListener('click', (e) => {
+    const t = e.target.closest('.thumb'); if (!t) return;
+    openDetail(Number(t.dataset.i));
+  });
+
+  // ---------- 横スクロール ----------
+  function step() { return Math.max(size + 12, track.clientWidth * 0.8); }
   function updateNav() {
     const maxScroll = track.scrollWidth - track.clientWidth;
     prev.hidden = track.scrollLeft <= 4;
@@ -127,16 +221,16 @@
   track.addEventListener('scroll', updateNav, { passive: true });
   window.addEventListener('resize', updateNav);
 
-  // 自動スクロール（マウスが乗っている間・タッチ操作中は止める）
+  // 自動スクロール（マウスが乗っている間・タッチ操作中・詳細表示中は止める）
   let paused = false;
   ['mouseenter', 'touchstart', 'focusin'].forEach((t) => track.parentElement.addEventListener(t, () => { paused = true; }, { passive: true }));
-  ['mouseleave', 'touchend', 'focusout'].forEach((t) => track.parentElement.addEventListener(t, () => { paused = false; }, { passive: true }));
+  ['mouseleave', 'touchend', 'focusout'].forEach((t) => track.parentElement.addEventListener(t, () => { if ($('modal').hidden) paused = false; }, { passive: true }));
   if (autoSec > 0) {
     setInterval(() => {
       if (paused || document.hidden) return;
       const maxScroll = track.scrollWidth - track.clientWidth;
       if (track.scrollLeft >= maxScroll - 4) track.scrollTo({ left: 0 });
-      else track.scrollBy({ left: step() });
+      else track.scrollBy({ left: size + 12 });
     }, autoSec * 1000);
   }
 
@@ -145,9 +239,9 @@
     .catch((e) => { if (userParam != null) return {}; throw e; }) // user= 指定時はデータが無くても表示
     .then((data) => {
       const valid = (u) => /^[A-Za-z0-9._]{1,30}$/.test(u);
-      const profiles = (userParam != null ? userParam.split(',') : (data.show_profiles === false ? [] : (data.profiles || [])))
+      const profiles = (userParam != null ? userParam.split(',') : (data.show_profiles === true ? (data.profiles || []) : []))
         .map((u) => String(u).trim().replace(/^@/, '')).filter(valid);
-      const posts = showPosts ? (data.posts || []).filter((p) => p.approved && p.code).slice(0, max) : [];
+      posts = showPosts ? (data.posts || []).filter((p) => p.approved && p.code).slice(0, max) : [];
       if (!posts.length && !profiles.length) {
         track.innerHTML = '<div class="empty">表示する投稿がありません</div>';
         return;
@@ -160,18 +254,21 @@
         track.appendChild(card);
         io.observe(card);
       });
-      posts.forEach((p) => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.dataset.code = p.code;
-        card.innerHTML = '<div class="ph">読み込み中…</div>';
-        track.appendChild(card);
-        io.observe(card);
+      posts.forEach((p, i) => {
+        const t = document.createElement('div');
+        t.className = 'thumb';
+        t.dataset.code = p.code;
+        t.dataset.i = i;
+        t.innerHTML = '<div class="ph">読み込み中…</div>' +
+          (showWho && p.author ? '<span class="who">@' + esc(p.author) + '</span>' : '') +
+          '<button type="button" class="hit" aria-label="' + esc((p.author ? '@' + p.author + ' の' : '') + '投稿の詳細を見る') + '"></button>';
+        track.appendChild(t);
+        io.observe(t);
       });
       updateNav();
     })
     .catch((e) => {
-      track.innerHTML = '<div class="empty">読み込みに失敗しました (' + e.message + ')</div>';
+      track.innerHTML = '<div class="empty">読み込みに失敗しました (' + esc(e.message) + ')</div>';
     });
 })();
 </script>
