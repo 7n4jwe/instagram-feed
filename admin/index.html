@@ -29,12 +29,30 @@
   .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
   .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
   .tabs button.on { background: #222; color: #fff; border-color: #222; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-  .item { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
-  .item.approved { border-color: var(--ok); box-shadow: 0 0 0 2px rgba(26,127,55,.25); }
-  .item .pv { height: 300px; overflow: hidden; background: #fafafa; position: relative; }
-  .item .pv iframe { width: 100%; height: 560px; border: 0; pointer-events: none; }
-  .item .pv .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #aaa; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 18px; align-items: start; }
+  .item { border: 2px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; display: flex; flex-direction: column; position: relative; }
+  .item.approved { border: 4px solid var(--ok); box-shadow: 0 0 0 3px rgba(26,127,55,.18); }
+  .item .mark { display: none; position: absolute; top: 118px; left: 12px; z-index: 2; background: var(--ok); color: #fff; font-weight: 700; font-size: 15px; padding: 6px 14px; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.3); pointer-events: none; }
+  .item.approved .mark { display: block; }
+  .item .pickbar { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--line); background: #fafafa; }
+  .item .pickbar .pick { flex: 1; font-weight: 700; padding: 8px 10px; }
+  .item.approved .pickbar .pick { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .item:not(.approved) .pickbar .pick { background: #fff; border: 2px solid var(--accent); color: var(--accent); }
+  .item .pv { background: #fafafa; position: relative; min-height: 200px; }
+  .item .pv iframe { display: block; width: 100%; height: 640px; border: 0; }
+  .item .pv .ph { height: 400px; display: flex; align-items: center; justify-content: center; color: #aaa; }
+  .modal { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.6); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 24px 12px; }
+  .modal[hidden] { display: none; }
+  .modal .mbox { width: min(560px, 100%); background: #fff; border-radius: 10px; overflow: hidden; }
+  .modal .mbox.approved { outline: 5px solid var(--ok); }
+  .modal .mhead { position: sticky; top: 0; display: flex; gap: 6px; align-items: center; padding: 8px; background: #fff; border-bottom: 1px solid var(--line); z-index: 1; }
+  .modal .mhead .pick { flex: 1; font-weight: 700; padding: 9px 10px; }
+  .modal .mbox.approved .pick { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .modal .mbox:not(.approved) .pick { border: 2px solid var(--accent); color: var(--accent); }
+  .modal iframe { display: block; width: 100%; height: 800px; border: 0; }
+  .bm { display: inline-block; padding: 8px 14px; border-radius: 18px; background: #e4405f; color: #fff !important; font-weight: 700; text-decoration: none; cursor: grab; }
+  .setup { background: #fff8e6; border: 1px solid #f0d58a; border-radius: 8px; padding: 10px 12px; margin: 0 0 12px; font-size: 13px; }
+  .setup p { margin: 6px 0 0; }
   .item .body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px; }
   .item .meta { font-size: 12px; color: var(--muted); word-break: break-all; }
   .item .meta a { color: var(--accent); }
@@ -116,34 +134,54 @@
     <p id="profMsg" class="status"></p>
   </section>
 
-  <section class="needs-token">
-    <h2>投稿を選んで追加<span class="tag">API不要</span></h2>
+  <section class="needs-token" id="pickSection">
+    <h2>投稿を選ぶ<span class="tag">API不要</span></h2>
+    <div class="setup">
+      <b>はじめに1回だけ：</b>このボタンを、ブラウザのブックマークバーへドラッグしてください →
+      <a class="bm" id="bmLink" href="#" title="ブックマークバーへドラッグ">📌 投稿を選ぶ</a>
+      <p>ブックマークバーが見えないときは <b>⌘ + Shift + B</b>（Windows は Ctrl + Shift + B）で表示できます。パソコンのブラウザ用です（スマホでは使えません）。</p>
+    </div>
     <ol class="steps">
-      <li>下のアカウント一覧で、表示したい投稿のサムネイルをクリック（Instagram が新しいタブで開きます）</li>
-      <li>開いたページのURLをコピー</li>
-      <li>この画面に戻って「クリップボードから追加」（または下の欄に貼り付けて「追加」）</li>
+      <li>下のアカウント一覧でサムネイルをクリック（Instagram が新しいタブで、大きな画面・本文付きで開きます）。Instagram で直接探して投稿を開いてもかまいません</li>
+      <li>気に入った投稿を開いたまま、ブックマークバーの「📌 投稿を選ぶ」を押す</li>
+      <li>小窓に「選びました ✓」と出れば完了です（保存も自動。この画面の「選択中」にも自動で反映されます）</li>
     </ol>
     <div class="picker" id="picker"></div>
-    <p class="hint" style="margin:-4px 0 10px">各アカウントに出るのは最新6件です。それより前の投稿は、Instagram でその投稿を開いてURLを貼ってください。</p>
+    <details>
+      <summary style="font-weight:400;font-size:13px">URLを貼り付けて追加する</summary>
     <textarea id="addUrls" placeholder="https://www.instagram.com/p/XXXXXXXXXXX/&#10;https://www.instagram.com/reel/YYYYYYYYYYY/&#10;（1行に1件、複数可）"></textarea>
     <div class="row" style="align-items:center;margin-top:8px">
       <div style="flex:0 0 auto"><button id="clipBtn" class="primary">クリップボードから追加</button></div>
       <div style="flex:0 0 auto"><button id="addBtn">追加</button></div>
-      <div style="flex:0 0 auto"><label style="display:flex;gap:6px;align-items:center;margin:0;color:#222;font-size:14px"><input id="addApproved" type="checkbox" checked> 追加と同時に「表示する」にする</label></div>
+      <div style="flex:0 0 auto"><label style="display:flex;gap:6px;align-items:center;margin:0;color:#222;font-size:14px"><input id="addApproved" type="checkbox" checked> 追加と同時に「選択中」にする</label></div>
       <div><span id="addMsg" class="status"></span></div>
     </div>
+    </details>
   </section>
 
   <section>
     <h2>投稿一覧</h2>
     <div class="tabs" id="tabs">
+      <button data-f="approved" class="on">選択中</button>
       <button data-f="pending">未確認の候補</button>
-      <button data-f="approved" class="on">表示中</button>
       <button data-f="all">すべて</button>
     </div>
-    <p class="hint" id="orderHint">「表示中」タブの並び順がそのまま埋め込みの表示順になります（← → で入れ替え）。「除外」した投稿は自動収集でも再度追加されません。</p>
+    <p class="hint" id="orderHint">選択中の投稿だけが、この並び順で埋め込みに表示されます（← → で入れ替え）。「大きく見る」で本文まで確認できます。「除外」した投稿は自動収集でも再度追加されません。</p>
     <div class="grid" id="grid"></div>
   </section>
+
+  <div class="modal" id="modal" hidden>
+    <div class="mbox" id="mbox">
+      <div class="mhead">
+        <button id="mPrev" title="前の投稿（←キー）">←</button>
+        <button id="mPick" class="pick"></button>
+        <button id="mNext" title="次の投稿（→キー）">→</button>
+        <a id="mOpen" href="#" target="_blank" rel="noopener" style="font-size:12px;white-space:nowrap">Instagram ↗</a>
+        <button id="mClose" title="閉じる（Esc）">×</button>
+      </div>
+      <iframe id="mFrame" title="Instagram post" scrolling="no"></iframe>
+    </div>
+  </div>
 
   <section id="srcSection">
     <h2>自動収集の対象<span class="tag api">Instagram API が必要</span></h2>
@@ -561,8 +599,9 @@
       if (!e.isIntersecting) return;
       previewIO.unobserve(e.target);
       const f = document.createElement('iframe');
-      f.src = 'https://www.instagram.com/p/' + encodeURIComponent(e.target.dataset.code) + '/embed/';
-      f.loading = 'lazy';
+      // captioned = 本文付きの埋め込み。高さは MEASURE メッセージで合わせる
+      f.src = 'https://www.instagram.com/p/' + encodeURIComponent(e.target.dataset.code) + '/embed/captioned/';
+      f.title = 'Instagram post';
       f.setAttribute('scrolling', 'no');
       e.target.replaceChildren(f);
     });
@@ -577,27 +616,36 @@
     return all;
   }
 
-  function render() {
-    const grid = $('grid');
-    const list = visiblePosts();
+  function renderTabs() {
     const counts = {
       approved: state.posts.posts.filter((p) => p.approved).length,
       pending: state.posts.posts.filter((p) => !p.approved && !p.reviewed).length,
       all: state.posts.posts.length,
     };
     document.querySelectorAll('#tabs button').forEach((b) => {
-      const label = { approved: '表示中', pending: '未確認の候補', all: 'すべて' }[b.dataset.f];
+      const label = { approved: '選択中', pending: '未確認の候補', all: 'すべて' }[b.dataset.f];
       b.textContent = label + ' (' + counts[b.dataset.f] + ')';
       b.classList.toggle('on', b.dataset.f === state.filter);
     });
+  }
+  const pickLabel = (p) => (p.approved ? '✓ 選択中（クリックで外す）' : '＋ 選ぶ');
+
+  function render() {
+    const grid = $('grid');
+    const list = visiblePosts();
+    renderTabs();
     $('orderHint').hidden = state.filter !== 'approved';
     if (!list.length) { grid.innerHTML = '<p class="hint">該当する投稿はありません。</p>'; return; }
     const ro = state.readonly ? 'disabled' : '';
     grid.innerHTML = list.map((p, idx) => `
       <div class="item ${p.approved ? 'approved' : ''}" data-code="${esc(p.code)}">
+        <div class="pickbar">
+          <button class="pick" data-act="toggle" ${ro}>${pickLabel(p)}</button>
+          <button data-act="zoom" title="本文まで大きく表示">大きく見る</button>
+        </div>
+        <span class="mark">✓ 選択中</span>
         <div class="pv" data-code="${esc(p.code)}"><div class="ph">プレビュー読み込み中…</div></div>
         <div class="body">
-          <label class="show" style="margin:0;color:#222;font-size:14px"><input type="checkbox" data-act="toggle" ${p.approved ? 'checked' : ''} ${ro}> 表示する</label>
           <div class="meta">
             ${p.author ? '@' + esc(p.author) + ' · ' : ''}<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.code)}</a>
             <span class="badge">${esc(sourceLabel(p.source))}</span>
@@ -623,14 +671,67 @@
     return s;
   }
 
-  $('grid').addEventListener('change', (e) => {
-    const item = e.target.closest('.item'); if (!item) return;
-    const p = state.posts.posts.find((x) => x.code === item.dataset.code); if (!p) return;
-    if (e.target.dataset.act === 'toggle') {
-      p.approved = e.target.checked;
-      p.reviewed = true;
-      setDirty(true);
-      render();
+  // 選択の切り替え。一覧全体を描き直すと埋め込みが再読み込みされるので、該当カードだけ更新する
+  function togglePick(code) {
+    if (state.readonly) return;
+    const p = state.posts.posts.find((x) => x.code === code); if (!p) return;
+    p.approved = !p.approved;
+    p.reviewed = true;
+    setDirty(true);
+    const item = $('grid').querySelector('.item[data-code="' + CSS.escape(code) + '"]');
+    if (item) {
+      item.classList.toggle('approved', p.approved);
+      item.querySelector('.pick').textContent = pickLabel(p);
+    }
+    renderTabs();
+    if (modalCode === code) renderModal();
+  }
+
+  // ---------- 大きく見る ----------
+  let modalCode = null;
+  function openModal(code) {
+    modalCode = code;
+    $('modal').hidden = false;
+    document.body.style.overflow = 'hidden';
+    $('mFrame').style.height = '800px';
+    $('mFrame').src = 'https://www.instagram.com/p/' + encodeURIComponent(code) + '/embed/captioned/';
+    renderModal();
+  }
+  function renderModal() {
+    const p = state.posts.posts.find((x) => x.code === modalCode); if (!p) return closeModal();
+    $('mbox').classList.toggle('approved', !!p.approved);
+    $('mPick').textContent = pickLabel(p);
+    $('mPick').disabled = state.readonly;
+    $('mOpen').href = p.url;
+    const list = visiblePosts(); const i = list.findIndex((x) => x.code === modalCode);
+    $('mPrev').disabled = i <= 0;
+    $('mNext').disabled = i < 0 || i >= list.length - 1;
+  }
+  function closeModal() { modalCode = null; $('modal').hidden = true; $('mFrame').src = 'about:blank'; document.body.style.overflow = ''; }
+  function moveModal(d) {
+    const list = visiblePosts(); const i = list.findIndex((x) => x.code === modalCode);
+    const n = list[i + d]; if (n) openModal(n.code);
+  }
+  $('mPick').addEventListener('click', () => togglePick(modalCode));
+  $('mPrev').addEventListener('click', () => moveModal(-1));
+  $('mNext').addEventListener('click', () => moveModal(1));
+  $('mClose').addEventListener('click', closeModal);
+  $('modal').addEventListener('click', (e) => { if (e.target === $('modal')) closeModal(); });
+  document.addEventListener('keydown', (e) => {
+    if ($('modal').hidden) return;
+    if (e.key === 'Escape') closeModal();
+    if (e.key === 'ArrowLeft') moveModal(-1);
+    if (e.key === 'ArrowRight') moveModal(1);
+  });
+
+  // 公式埋め込みが送ってくる高さに合わせる（本文の長さで変わる）
+  window.addEventListener('message', (ev) => {
+    if (!/^https:\/\/(www\.)?instagram\.com$/.test(ev.origin)) return;
+    let d = ev.data;
+    if (typeof d === 'string') { try { d = JSON.parse(d); } catch (_) { return; } }
+    if (!d || d.type !== 'MEASURE' || !d.details || !d.details.height) return;
+    for (const f of document.querySelectorAll('#grid iframe, #mFrame')) {
+      if (f.contentWindow === ev.source) { f.style.height = Math.ceil(d.details.height) + 'px'; break; }
     }
   });
   $('grid').addEventListener('input', (e) => {
@@ -641,6 +742,8 @@
   });
   $('grid').addEventListener('click', (e) => {
     const act = e.target.dataset && e.target.dataset.act;
+    if (act === 'toggle') { togglePick(e.target.closest('.item').dataset.code); return; }
+    if (act === 'zoom') { openModal(e.target.closest('.item').dataset.code); return; }
     if (!act || !['up', 'down', 'skip', 'dismiss'].includes(act)) return;
     const item = e.target.closest('.item');
     const arr = state.posts.posts;
@@ -683,6 +786,24 @@
   });
   $('addBtn').addEventListener('click', addUrls);
   $('saveBtn').addEventListener('click', save);
+
+  // ---------- ブックマークレット ----------
+  (function () {
+    const pick = new URL('pick.html', location.href).href;
+    const code = "(function(){var u=location.href;if(!/instagram\\.com\\/(?:[^\\/]+\\/)?(?:p|reels?|tv)\\/[A-Za-z0-9_-]+/.test(u)){alert('Instagram で投稿を開いてから押してください');return;}" +
+      "window.open('" + pick + "#'+encodeURIComponent(u),'igfeedpick','width=440,height=300');})()";
+    $('bmLink').href = 'javascript:' + code;
+    $('bmLink').addEventListener('click', (e) => { e.preventDefault(); alert('このボタンはクリックではなく、ブックマークバーへドラッグして登録してください。'); });
+  })();
+
+  // 小窓（pick.html）で選択が保存されたら読み直す
+  try {
+    new BroadcastChannel('igfeed').onmessage = (e) => {
+      if (!e.data || e.data.type !== 'picked') return;
+      if (state.dirty) { setStatus('Instagram 側で選んだ投稿が保存されました。未保存の変更を保存する前に「接続して読み込み」で読み直してください。', 'err'); return; }
+      load();
+    };
+  } catch (_) {}
 
   loadCfg();
   load();

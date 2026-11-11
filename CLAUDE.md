@@ -8,7 +8,7 @@ Webサイト（Wix 等）に iframe で埋め込める Instagram 投稿の横ス
 
 - **リポスト前提ではない**。他人のアカウントの投稿をそのまま表示する。
 - 表示は **Instagram 公式埋め込み**（`https://www.instagram.com/p/{code}/embed/`）。他人の画像をリポジトリに保存・再配信しない（権利面のため）。
-- **アカウント表示（API不要）**：公式プロフィール埋め込み `https://www.instagram.com/{username}/embed/`（最新6件・自動更新）。posts.json の `profiles` に保存。管理画面「投稿を選んで追加」に各アカウントの埋め込みを並べ、クリック→URLコピー→「クリップボードから追加」で個別投稿を選ぶ（埋め込み内の投稿コードはクロスオリジンで読めないため手動コピー）。`show_profiles: false` で embed.html の先頭にアカウント枠を出さない（未設定=表示）。高さ通知（MEASURE）は0で来るので `w*2/3+152` で固定。localhost からの iframe では描画されない（GitHub Pages 上では表示を確認済み 2026-11-11）
+- **アカウント表示（API不要）**：公式プロフィール埋め込み `https://www.instagram.com/{username}/embed/`（最新6件・自動更新）。posts.json の `profiles` に保存。管理画面「投稿を選ぶ」に各アカウントの埋め込みを並べる。埋め込み内の投稿コードはクロスオリジンで読めないため、選択は **ブックマークレット「📌 投稿を選ぶ」**（Instagram の投稿ページで押す → `admin/pick.html#<URL>` を小窓で開き、localStorage の接続設定で posts.json を読み→approved:true→保存。409/422 は1回だけ読み直して再試行。BroadcastChannel `igfeed` で管理画面に通知し、未保存変更がなければ再読み込み）。ユーザーの選択でこの方式に決定（2026-11-11）。`show_profiles: false` で embed.html の先頭にアカウント枠を出さない（未設定=表示）。高さ通知（MEASURE）は0で来るので `w*2/3+152` で固定。localhost からの iframe では描画されない（GitHub Pages 上では表示を確認済み 2026-11-11）
 - ハッシュタグの API 不要な公式埋め込みは無い（`/explore/tags/{tag}/embed/` は404）。審査なしなら手動URL追加
 - 候補の集め方は2系統：
   1. **URL貼り付けで手動追加**（フェーズ1。どのアカウントの公開投稿でも可、API不要）
@@ -22,7 +22,8 @@ Webサイト（Wix 等）に iframe で埋め込める Instagram 投稿の横ス
 ## 構成
 
 - `embed.html` — `data/posts.json` の `approved: true` を配列順に表示。IntersectionObserver で遅延読み込み、矢印/スワイプ/`?auto=秒`。公式埋め込みの `MEASURE` postMessage で iframe 高さを調整。パラメータ: `w`, `caption`, `auto`, `max`, `bg`, `data`, `user`（カンマ区切りでアカウント指定）, `posts=0`
-- `admin/index.html` — 接続設定、URL追加、タブ（未確認の候補/表示中/すべて）、表示チェック、←→並べ替え（表示中同士）、見送り（`reviewed: true`）、除外（`dismissed` に入れて自動収集でも再追加しない）、自動収集の対象（アカウント/ハッシュタグを追加・削除、URLからユーザー名・タグを抽出、ハッシュタグ有効化、取得件数、前回の収集結果の表示、「今すぐ収集を実行」= workflow_dispatch。トークンに Actions: Read and write が必要）。sha 競合（409/422）時は再読み込みを促す
+- `admin/pick.html` — ブックマークレットの受け口（上記）
+- `admin/index.html` — 接続設定、URL追加、タブ（選択中/未確認の候補/すべて）、本文付き（/embed/captioned/、MEASURE で高さ合わせ）の大きなカード、「＋ 選ぶ／✓ 選択中」切替（該当カードだけ更新して iframe を再読込しない）、「大きく見る」モーダル（←→/Esc）、←→並べ替え（表示中同士）、見送り（`reviewed: true`）、除外（`dismissed` に入れて自動収集でも再追加しない）、自動収集の対象（アカウント/ハッシュタグを追加・削除、URLからユーザー名・タグを抽出、ハッシュタグ有効化、取得件数、前回の収集結果の表示、「今すぐ収集を実行」= workflow_dispatch。トークンに Actions: Read and write が必要）。sha 競合（409/422）時は再読み込みを促す
 - `data/posts.json` — `{ updated_at, profiles: [username], show_profiles?, posts: [{code,url,author,source,added_at,posted_at?,caption?,approved,reviewed?,note}], dismissed: [code] }`。`source` は `manual` / `user:名前` / `tag:名前`
 - `data/sources.json` — `{ users: [], hashtags: [], hashtag_enabled: false, max_per_source: 12 }`
 - `data/collect_status.json` — collect.mjs が書く前回結果 `{ ran_at, added, results: [{kind,name,ok,fetched?,added?,error?,skipped?}] }`
