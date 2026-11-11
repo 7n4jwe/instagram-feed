@@ -145,7 +145,7 @@
     .catch((e) => { if (userParam != null) return {}; throw e; }) // user= 指定時はデータが無くても表示
     .then((data) => {
       const valid = (u) => /^[A-Za-z0-9._]{1,30}$/.test(u);
-      const profiles = (userParam != null ? userParam.split(',') : (data.profiles || []))
+      const profiles = (userParam != null ? userParam.split(',') : (data.show_profiles === false ? [] : (data.profiles || [])))
         .map((u) => String(u).trim().replace(/^@/, '')).filter(valid);
       const posts = showPosts ? (data.posts || []).filter((p) => p.approved && p.code).slice(0, max) : [];
       if (!posts.length && !profiles.length) {

@@ -58,6 +58,12 @@
   .chips li button { padding: 1px 8px; font-size: 12px; }
   .chips .empty { border-style: dashed; color: var(--muted); justify-content: center; }
   .off { opacity: .55; }
+  .picker { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 10px; margin: 0 0 10px; }
+  .picker .pk { flex: 0 0 326px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fafafa; }
+  .picker .pk iframe { display: block; width: 326px; height: 420px; border: 0; }
+  .picker .pk .ph { height: 420px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 13px; }
+  .steps { margin: 0 0 10px; padding-left: 1.4em; font-size: 13px; }
+  .steps li { margin: 2px 0; }
   .ro-note { display: none; font-size: 12px; color: var(--warn); margin: 0 0 8px; }
   .readonly .ro-note { display: block; }
   section h2 .tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; background: #e6f4ea; color: var(--ok); margin-left: 6px; vertical-align: 1px; }
@@ -98,9 +104,10 @@
   </section>
 
   <section id="profSection">
-    <h2>表示するアカウント<span class="tag">API不要</span></h2>
+    <h2>アカウント<span class="tag">API不要</span></h2>
     <p class="ro-note">編集するには、上の「接続設定」でトークンを入力して接続してください。</p>
-    <p class="hint" style="margin:0 0 10px">アカウントを登録すると、Instagram 公式のプロフィール埋め込み（最新6件のサムネイル）が埋め込みの先頭に並びます。新しい投稿は Instagram 側で自動的に反映されます。公開アカウントならビジネス／個人を問わず使えます（非公開アカウントは表示されません）。</p>
+    <p class="hint" style="margin:0 0 10px">登録したアカウントの最新投稿が、下の「投稿を選んで追加」に並びます。公開アカウントならビジネス／個人を問わず使えます（非公開アカウントは表示されません）。</p>
+    <label class="inline"><input id="showProfiles" type="checkbox"> 埋め込みの先頭に、アカウントの枠（プロフィールと最新6件）も表示する</label>
     <div class="adder needs-token">
       <input id="profIn" type="text" placeholder="ユーザー名 または プロフィールURL（カンマ区切りで複数可）">
       <button id="profAdd">追加</button>
@@ -110,9 +117,17 @@
   </section>
 
   <section class="needs-token">
-    <h2>投稿を追加（URLを貼り付け）<span class="tag">API不要</span></h2>
+    <h2>投稿を選んで追加<span class="tag">API不要</span></h2>
+    <ol class="steps">
+      <li>下のアカウント一覧で、表示したい投稿のサムネイルをクリック（Instagram が新しいタブで開きます）</li>
+      <li>開いたページのURLをコピー</li>
+      <li>この画面に戻って「クリップボードから追加」（または下の欄に貼り付けて「追加」）</li>
+    </ol>
+    <div class="picker" id="picker"></div>
+    <p class="hint" style="margin:-4px 0 10px">各アカウントに出るのは最新6件です。それより前の投稿は、Instagram でその投稿を開いてURLを貼ってください。</p>
     <textarea id="addUrls" placeholder="https://www.instagram.com/p/XXXXXXXXXXX/&#10;https://www.instagram.com/reel/YYYYYYYYYYY/&#10;（1行に1件、複数可）"></textarea>
     <div class="row" style="align-items:center;margin-top:8px">
+      <div style="flex:0 0 auto"><button id="clipBtn" class="primary">クリップボードから追加</button></div>
       <div style="flex:0 0 auto"><button id="addBtn">追加</button></div>
       <div style="flex:0 0 auto"><label style="display:flex;gap:6px;align-items:center;margin:0;color:#222;font-size:14px"><input id="addApproved" type="checkbox" checked> 追加と同時に「表示する」にする</label></div>
       <div><span id="addMsg" class="status"></span></div>
@@ -241,6 +256,7 @@
     state.posts.posts = Array.isArray(state.posts.posts) ? state.posts.posts : [];
     state.posts.dismissed = Array.isArray(state.posts.dismissed) ? state.posts.dismissed : [];
     state.posts.profiles = Array.isArray(state.posts.profiles) ? state.posts.profiles : [];
+    state.posts.show_profiles = state.posts.show_profiles !== false;
     state.sources = state.sources || {};
     state.sources.users = Array.isArray(state.sources.users) ? state.sources.users : [];
     state.sources.hashtags = Array.isArray(state.sources.hashtags) ? state.sources.hashtags : [];
@@ -449,7 +465,21 @@
   });
 
   // ---------- 表示するアカウント（プロフィール埋め込み） ----------
+  let pickerKey = null;
+  function renderPicker() {
+    const list = state.posts.profiles;
+    const key = list.join(',');
+    if (key === pickerKey) return; // 変化が無ければ iframe を作り直さない
+    pickerKey = key;
+    const el = $('picker');
+    if (!list.length) { el.innerHTML = '<p class="hint">上の「アカウント」にアカウントを登録すると、ここに最新投稿が並びます。</p>'; return; }
+    el.innerHTML = list.map((u) => '<div class="pk"><iframe loading="lazy" scrolling="no" title="@' + esc(u) + '" src="https://www.instagram.com/' + encodeURIComponent(u) + '/embed/"></iframe></div>').join('');
+  }
+
   function renderProfiles() {
+    $('showProfiles').checked = state.posts.show_profiles;
+    $('showProfiles').disabled = state.readonly;
+    renderPicker();
     const list = state.posts.profiles;
     const ul = $('profList');
     if (!list.length) { ul.innerHTML = '<li class="empty">アカウントは未登録です</li>'; return; }
@@ -480,6 +510,22 @@
     if (added) { $('profIn').value = ''; setDirty(true); renderProfiles(); }
   }
   $('profAdd').addEventListener('click', addProfiles);
+  $('showProfiles').addEventListener('change', (e) => { state.posts.show_profiles = e.target.checked; setDirty(true); });
+  $('clipBtn').addEventListener('click', async () => {
+    let text = '';
+    try { text = await navigator.clipboard.readText(); } catch (_) {
+      $('addMsg').textContent = 'クリップボードを読めませんでした。下の欄に貼り付けて「追加」を押してください。';
+      $('addMsg').className = 'status err';
+      return;
+    }
+    if (!/instagram\.com/.test(text)) {
+      $('addMsg').textContent = 'クリップボードに Instagram のURLがありません。';
+      $('addMsg').className = 'status err';
+      return;
+    }
+    $('addUrls').value = text;
+    addUrls();
+  });
   $('profIn').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) addProfiles(); });
   $('profList').addEventListener('click', (e) => {
     const act = e.target.dataset.act; if (!act) return;
