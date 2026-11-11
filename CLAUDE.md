@@ -20,7 +20,7 @@ Webサイト（Wix 等）に iframe で埋め込める Instagram 投稿の横ス
 - サーバーなし。GitHub Pages（main / root）。無料プランなので公開リポジトリ前提。
 
 - **選ぶ手段は Chrome 拡張（`extension/`、MV3、未公開・デベロッパーモードで読み込み）が主**（2026-11-11 決定）。content.js が Instagram の一覧の写真（`a[href*=/p/|/reel/]` かつ img を含む）に＋/✓ボタン、投稿表示中は右下 FAB、フィードは article 右上。background.js が GitHub Contents API で posts.json を read-modify-write（409/422 は3回まで再試行）。トークンは chrome.storage.local。ブックマークレット＋admin/pick.html は予備
-- **埋め込みは写真だけ**：`/p/{code}/embed/` を正方形の枠で top:-56px に置いてヘッダーを隠し、透明ボタンでクリックを受けて詳細モーダル（`/embed/captioned/`、MEASURE で高さ）。画像はコピーしない（権利面）。ヘッダーを隠すのは Meta 規約上グレーなので、写真の左下に @投稿者名 を出している（`who=0` で消せる）。`show_profiles` は既定オフ
+- **埋め込みは写真だけ**：`/p/{code}/embed/` を正方形の枠で top:-(56px+size×0.125) に置いてヘッダーを隠し写真の中央を切り出す（埋め込みの写真枠は常に 4:5、MEASURE は投稿によらず同じ高さで来る）、透明ボタンでクリックを受けて詳細モーダル（`/embed/captioned/`、MEASURE で高さ）。画像はコピーしない（権利面）。ヘッダーを隠すのは Meta 規約上グレーなので、写真の左下に @投稿者名 を出している（`who=0` で消せる）。`show_profiles` は既定オフ
 
 ## 構成
 

@@ -27,8 +27,9 @@
     position: relative; overflow: hidden; scroll-snap-align: start;
     border-radius: 8px; background: #eee; cursor: pointer;
   }
+  /* 公式埋め込みの写真部分は常に 4:5（縦長）なので、ヘッダー(約56px)を隠し、上下の中央を正方形で切り出す */
   .thumb iframe {
-    position: absolute; top: -56px; left: -1px; border: 0;
+    position: absolute; top: calc(-56px - var(--size) * 0.125); left: -1px; border: 0;
     width: calc(var(--size) + 2px); height: calc(var(--size) * 1.6 + 120px);
     pointer-events: none;
   }
