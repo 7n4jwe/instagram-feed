@@ -51,8 +51,9 @@
 
 <script>
 /*
- * 承認済み（approved: true）の投稿だけを横スクロールで表示する埋め込みページ。
- * 表示は Instagram 公式の埋め込み（/p/{code}/embed/）を使う。
+ * 登録したアカウント（profiles）と、承認済み（approved: true）の投稿を横スクロールで表示する埋め込みページ。
+ * 表示は Instagram 公式の埋め込みを使う（アカウント: /{username}/embed/、投稿: /p/{code}/embed/）。
+ * アカウントの埋め込みは API 不要で、そのアカウントの最新投稿（6件）が自動で更新される。
  *
  * URLパラメータ:
  *   w=326        カード幅(px)
@@ -60,6 +61,8 @@
  *   auto=5       5秒ごとに自動スクロール（0で無効）
  *   max=30       表示する最大件数
  *   bg=ffffff    背景色（16進、#なし）
+ *   user=a,b     表示するアカウントを直接指定（posts.json の profiles より優先）
+ *   posts=0      個別の投稿を表示しない（アカウントだけ表示）
  *   data=...     posts.json の場所（通常は不要）
  */
 (function () {
@@ -69,6 +72,10 @@
   const autoSec = parseFloat(q.get('auto') || '0');
   const max = parseInt(q.get('max') || '50', 10);
   const dataUrl = q.get('data') || 'data/posts.json';
+  const userParam = q.get('user');
+  const showPosts = q.get('posts') !== '0';
+  // アカウント埋め込みは高さを通知してこないので、幅から計算（ヘッダー＋3列×2段のサムネイル）
+  const profileH = Math.round(cardW * 2 / 3 + 152);
   if (q.get('bg')) document.documentElement.style.setProperty('--bg', '#' + q.get('bg').replace(/[^0-9a-fA-F]/g, ''));
   document.documentElement.style.setProperty('--card-w', cardW + 'px');
 
@@ -76,8 +83,9 @@
   const prev = document.querySelector('.prev');
   const next = document.querySelector('.next');
 
-  function embedSrc(code) {
-    return 'https://www.instagram.com/p/' + encodeURIComponent(code) + '/embed/' + (caption ? 'captioned/' : '');
+  function embedSrc(card) {
+    if (card.dataset.user) return 'https://www.instagram.com/' + encodeURIComponent(card.dataset.user) + '/embed/';
+    return 'https://www.instagram.com/p/' + encodeURIComponent(card.dataset.code) + '/embed/' + (caption ? 'captioned/' : '');
   }
 
   // 画面に近づいたカードから iframe を読み込む
@@ -87,8 +95,9 @@
       const card = e.target;
       io.unobserve(card);
       const f = document.createElement('iframe');
-      f.src = embedSrc(card.dataset.code);
-      f.title = 'Instagram post';
+      f.src = embedSrc(card);
+      f.title = card.dataset.user ? 'Instagram @' + card.dataset.user : 'Instagram post';
+      if (card.dataset.user) f.style.height = profileH + 'px';
       f.setAttribute('scrolling', 'no');
       f.setAttribute('allowtransparency', 'true');
       f.setAttribute('allow', 'encrypted-media');
@@ -133,12 +142,24 @@
 
   fetch(dataUrl + (dataUrl.includes('?') ? '&' : '?') + 't=' + Date.now())
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .catch((e) => { if (userParam != null) return {}; throw e; }) // user= 指定時はデータが無くても表示
     .then((data) => {
-      const posts = (data.posts || []).filter((p) => p.approved && p.code).slice(0, max);
-      if (!posts.length) {
+      const valid = (u) => /^[A-Za-z0-9._]{1,30}$/.test(u);
+      const profiles = (userParam != null ? userParam.split(',') : (data.profiles || []))
+        .map((u) => String(u).trim().replace(/^@/, '')).filter(valid);
+      const posts = showPosts ? (data.posts || []).filter((p) => p.approved && p.code).slice(0, max) : [];
+      if (!posts.length && !profiles.length) {
         track.innerHTML = '<div class="empty">表示する投稿がありません</div>';
         return;
       }
+      profiles.forEach((u) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.user = u;
+        card.innerHTML = '<div class="ph" style="height:' + profileH + 'px">読み込み中…</div>';
+        track.appendChild(card);
+        io.observe(card);
+      });
       posts.forEach((p) => {
         const card = document.createElement('div');
         card.className = 'card';

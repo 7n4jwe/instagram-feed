@@ -58,6 +58,10 @@
   .chips li button { padding: 1px 8px; font-size: 12px; }
   .chips .empty { border-style: dashed; color: var(--muted); justify-content: center; }
   .off { opacity: .55; }
+  .ro-note { display: none; font-size: 12px; color: var(--warn); margin: 0 0 8px; }
+  .readonly .ro-note { display: block; }
+  section h2 .tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; background: #e6f4ea; color: var(--ok); margin-left: 6px; vertical-align: 1px; }
+  section h2 .tag.api { background: #fff1e0; color: var(--warn); }
   .count { font-size: 12px; font-weight: 400; color: var(--muted); }
   .count.over { color: #c00; font-weight: 600; }
   .inline { display: flex !important; gap: 6px; align-items: center; color: #222 !important; font-size: 13px !important; margin: 6px 0 !important; }
@@ -93,8 +97,20 @@
     </details>
   </section>
 
+  <section id="profSection">
+    <h2>表示するアカウント<span class="tag">API不要</span></h2>
+    <p class="ro-note">編集するには、上の「接続設定」でトークンを入力して接続してください。</p>
+    <p class="hint" style="margin:0 0 10px">アカウントを登録すると、Instagram 公式のプロフィール埋め込み（最新6件のサムネイル）が埋め込みの先頭に並びます。新しい投稿は Instagram 側で自動的に反映されます。公開アカウントならビジネス／個人を問わず使えます（非公開アカウントは表示されません）。</p>
+    <div class="adder needs-token">
+      <input id="profIn" type="text" placeholder="ユーザー名 または プロフィールURL（カンマ区切りで複数可）">
+      <button id="profAdd">追加</button>
+    </div>
+    <ul class="chips" id="profList"></ul>
+    <p id="profMsg" class="status"></p>
+  </section>
+
   <section class="needs-token">
-    <h2>投稿を追加（URLを貼り付け）</h2>
+    <h2>投稿を追加（URLを貼り付け）<span class="tag">API不要</span></h2>
     <textarea id="addUrls" placeholder="https://www.instagram.com/p/XXXXXXXXXXX/&#10;https://www.instagram.com/reel/YYYYYYYYYYY/&#10;（1行に1件、複数可）"></textarea>
     <div class="row" style="align-items:center;margin-top:8px">
       <div style="flex:0 0 auto"><button id="addBtn">追加</button></div>
@@ -115,7 +131,8 @@
   </section>
 
   <section id="srcSection">
-    <h2>自動収集の対象</h2>
+    <h2>自動収集の対象<span class="tag api">Instagram API が必要</span></h2>
+    <p class="ro-note">編集するには、上の「接続設定」でトークンを入力して接続してください。</p>
     <p class="hint" style="margin:0 0 10px">ここに登録したアカウント・ハッシュタグの新しい投稿を、毎日 6:17（日本時間）に「未確認の候補」へ追加します。変更したら「保存（GitHubに反映）」を押してください。収集には Instagram API の設定（README の手順5）が必要です。</p>
     <div class="row">
       <div class="srcbox">
@@ -223,6 +240,7 @@
     state.posts = state.posts || {};
     state.posts.posts = Array.isArray(state.posts.posts) ? state.posts.posts : [];
     state.posts.dismissed = Array.isArray(state.posts.dismissed) ? state.posts.dismissed : [];
+    state.posts.profiles = Array.isArray(state.posts.profiles) ? state.posts.profiles : [];
     state.sources = state.sources || {};
     state.sources.users = Array.isArray(state.sources.users) ? state.sources.users : [];
     state.sources.hashtags = Array.isArray(state.sources.hashtags) ? state.sources.hashtags : [];
@@ -256,6 +274,7 @@
       setDirty(false);
       render();
       renderSources();
+      renderProfiles();
       setStatus(state.readonly ? '閲覧モード（保存するには接続設定でトークンを入力）' : '読み込み完了', state.readonly ? '' : 'ok');
       if (state.readonly) $('settingsBox').open = true;
     } catch (e) {
@@ -427,6 +446,49 @@
     const n = parseInt(e.target.value, 10);
     state.sources.max_per_source = Number.isFinite(n) ? Math.min(50, Math.max(1, n)) : 12;
     setDirty(true); renderSources();
+  });
+
+  // ---------- 表示するアカウント（プロフィール埋め込み） ----------
+  function renderProfiles() {
+    const list = state.posts.profiles;
+    const ul = $('profList');
+    if (!list.length) { ul.innerHTML = '<li class="empty">アカウントは未登録です</li>'; return; }
+    ul.innerHTML = list.map((name, i) =>
+      '<li data-i="' + i + '">' +
+      '<a href="https://www.instagram.com/' + encodeURIComponent(name) + '/" target="_blank" rel="noopener">@' + esc(name) + '</a>' +
+      '<span class="st"><a href="../embed.html?posts=0&amp;user=' + encodeURIComponent(name) + '" target="_blank" style="font-weight:400;color:var(--accent)">表示を確認 ↗</a></span>' +
+      '<button class="needs-token" data-act="pup" title="前へ" ' + (i === 0 ? 'disabled' : '') + '>↑</button>' +
+      '<button class="needs-token" data-act="pdown" title="後ろへ" ' + (i === list.length - 1 ? 'disabled' : '') + '>↓</button>' +
+      '<button class="needs-token" data-act="prm" title="表示をやめる">削除</button></li>').join('');
+  }
+  function addProfiles() {
+    const list = state.posts.profiles;
+    let added = 0, dup = 0; const bad = [];
+    for (const raw of $('profIn').value.split(/[\s,、]+/)) {
+      if (!raw.trim()) continue;
+      const v = parseUser(raw);
+      if (!v) { bad.push(raw); continue; }
+      if (list.includes(v)) { dup++; continue; }
+      list.push(v); added++;
+    }
+    const msg = [];
+    if (added) msg.push('追加 ' + added + ' 件');
+    if (dup) msg.push('登録済み ' + dup);
+    if (bad.length) msg.push('認識できません: ' + bad.join(' '));
+    $('profMsg').textContent = msg.join(' / ');
+    $('profMsg').className = 'status ' + (bad.length ? 'err' : 'ok');
+    if (added) { $('profIn').value = ''; setDirty(true); renderProfiles(); }
+  }
+  $('profAdd').addEventListener('click', addProfiles);
+  $('profIn').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) addProfiles(); });
+  $('profList').addEventListener('click', (e) => {
+    const act = e.target.dataset.act; if (!act) return;
+    const list = state.posts.profiles;
+    const i = Number(e.target.closest('li').dataset.i);
+    if (act === 'prm') list.splice(i, 1);
+    if (act === 'pup' && i > 0) [list[i - 1], list[i]] = [list[i], list[i - 1]];
+    if (act === 'pdown' && i < list.length - 1) [list[i + 1], list[i]] = [list[i], list[i + 1]];
+    setDirty(true); renderProfiles();
   });
 
   async function runCollect() {
