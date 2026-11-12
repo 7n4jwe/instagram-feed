@@ -26,6 +26,7 @@ Webサイト（Wix 等）に iframe で埋め込める Instagram 投稿の横ス
 - 拡張の一覧ボタンは、投稿へのリンクで大きさ100px以上のもの（動画タイルは img が無いことがあるので画像の有無では判断しない）＋フィードの200px以上の動画/画像（親をたどって投稿リンクが1つだけの範囲を投稿とみなす）に付ける。ただしホームのフィード（time を含む article）は、写真・動画の上だと動画の再生用画像に隠れ、右上は「フォローする」と重なるため、操作アイコン列（保存アイコンの svg[aria-label=保存する] を含む section）の right:36px に置く（2026-11-12 ログイン中の実画面で確認）。広告（time 無し・投稿リンク無し）には付かない
 - 拡張の **アカウントバー**（1.2.0）：posts.json の `profiles` を画面上部に並べ、クリックで pickMode をオンにしてそのプロフィールへ移動。件数は approved の author 集計。プロフィール上で登録／解除（background の setProfile）。「Instagram のページを管理画面に取り込む」は不可（フレーム禁止・サーバー取得は規約違反の自動収集）なので、Instagram 上で選ぶ体験を拡張で整える方針
 - 拡張の **選択モード**（1.1.0）：一覧ページで左下のスイッチ。オン中は window の捕捉段階で pointerdown/mousedown/mouseup/click を止め、一覧の写真（a.igf-host に .igf-tile があるもの）のクリックを選択／解除にする。状態は chrome.storage.local の pickMode。実 Instagram で実クリックが遷移しないことを確認済み
+- **ブックマークレット「📌 選択ボタン」**（2026-11-12 試作、拡張を配らずに済ませる案）：管理画面が `extension/content.js`＋`content.css` を読み込み、`chrome` の代用（shim）で包んで javascript: URL にする（約38KB、拡張と常に同じコード）。Instagram の CSP（connect-src）で GitHub に直接保存できないため、`window.open` で `admin/bridge.html`（保存用の窓）を開き postMessage で依頼。bridge は origin が `https://www.instagram.com` のメッセージだけ受け付け、管理画面と同じ localStorage の接続設定で保存（処理は background.js と同じ）。pickMode/barOpen は Instagram 側の sessionStorage。ページを読み込み直すと消えるので押し直しが必要。Instagram の応答ヘッダーは COOP unsafe-none・style 'unsafe-inline' 可（未ログインで確認）。ローカルの模擬ページでは動作確認済み、実 Instagram では未確認
 
 ## 構成
 

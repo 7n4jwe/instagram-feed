@@ -144,7 +144,9 @@
     <div class="picker" id="picker"></div>
     <details style="margin-bottom:8px">
       <summary style="font-weight:400;font-size:13px">拡張を使わない方法（ブックマークで選ぶ）</summary>
-      <p class="hint">このボタンをブックマークバーへドラッグ → <a class="bm" id="bmLink" href="#" title="ブックマークバーへドラッグ">📌 投稿を選ぶ</a>　Instagram で投稿を開いた状態で押すと、小窓で選択・保存します。</p>
+      <p class="hint"><b>選択ボタン（拡張と同じ操作）</b>：このボタンをブックマークバーへドラッグ → <a class="bm" id="bmFull" href="#" title="ブックマークバーへドラッグ">📌 選択ボタン</a> <span id="bmFullNote"></span><br>
+      Instagram を開いた状態で押すと、写真に ＋／✓ ボタン、選択モード、アカウントバーが出ます。同時に開く「保存用の窓」は閉じずに横へ置いてください。ページを読み込み直したとき（アカウントバーで移動したときなど）は、もう一度押します。</p>
+      <p class="hint"><b>1件ずつ選ぶ簡易版</b>：このボタンをブックマークバーへドラッグ → <a class="bm" id="bmLink" href="#" title="ブックマークバーへドラッグ">📌 投稿を選ぶ</a>　Instagram で投稿を開いた状態で押すと、小窓で選択・保存します。</p>
     </details>
     <details>
       <summary style="font-weight:400;font-size:13px">URLを貼り付けて追加する</summary>
@@ -793,6 +795,59 @@
       "window.open('" + pick + "#'+encodeURIComponent(u),'igfeedpick','width=440,height=300');})()";
     $('bmLink').href = 'javascript:' + code;
     $('bmLink').addEventListener('click', (e) => { e.preventDefault(); alert('このボタンはクリックではなく、ブックマークバーへドラッグして登録してください。'); });
+  })();
+
+  // ---------- ブックマークレット「選択ボタン」：拡張（extension/content.js）と同じ画面操作を、インストールなしで ----------
+  // Instagram のページからは GitHub に保存できないので、保存は bridge.html（保存用の窓）に頼む
+  (async function () {
+    const link = $('bmFull');
+    link.addEventListener('click', (e) => { e.preventDefault(); alert('このボタンはクリックではなく、ブックマークバーへドラッグして登録してください。'); });
+    try {
+      const get = async (u) => { const r = await fetch(new URL(u, location.href), { cache: 'no-store' }); if (!r.ok) throw new Error(r.status); return r.text(); };
+      const [js, css] = await Promise.all([get('../extension/content.js'), get('../extension/content.css')]);
+      // 行全体がコメントの行と空行を除いて短くする
+      const body = js.split('\n').filter((l) => !/^\s*(\/\/.*)?$/.test(l)).join('\n');
+      const style = css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s*\n\s*/g, ' ');
+      const shim = function (BR, CSS_TEXT) {
+        if (window.__igfBM) { window.__igfBM.open(); return null; }
+        if (!/(^|\.)instagram\.com$|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) { alert('Instagram を開いてから押してください'); return null; }
+        var BRO = new URL(BR).origin, win = null, ready = false, seq = 0, pend = {}, queue = [];
+        function open() { ready = false; win = window.open(BR, 'igfBridge', 'width=380,height=480'); }
+        function post(m) { try { win.postMessage(m, BRO); } catch (e) {} }
+        window.addEventListener('message', function (e) {
+          if (e.origin !== BRO) return;
+          var d = e.data || {};
+          if (d.igf === 'ready') { win = e.source; ready = true; queue.splice(0).forEach(post); }
+          if (d.igf === 'reply' && pend[d.id]) { var cb = pend[d.id]; delete pend[d.id]; cb(d.r); }
+        });
+        window.__igfBM = { open: open };
+        var st = document.createElement('style'); st.textContent = CSS_TEXT; document.head.appendChild(st);
+        open();
+        return {
+          runtime: { lastError: null, sendMessage: function (msg, cb) {
+            if (msg.type === 'openOptions') { open(); return cb({ ok: true }); }
+            if (!win || win.closed) {
+              if (msg.type === 'getSelected') return cb({ ok: false, error: '保存用の窓が閉じています' });
+              open(); // クリック操作の中なので開ける
+              if (!win) return cb({ ok: false, error: '保存用の窓を開けませんでした。ブックマークの「選択ボタン」をもう一度押してください' });
+            }
+            var id = ++seq, m = { igf: 'req', id: id, msg: msg };
+            pend[id] = cb;
+            setTimeout(function () { if (pend[id]) { delete pend[id]; cb({ ok: false, error: '保存用の窓から応答がありません。「選択ボタン」をもう一度押してください' }); } }, 20000);
+            if (ready) post(m); else queue.push(m);
+          } },
+          storage: { local: {
+            get: function (k, cb) { var o = {}; try { var v = sessionStorage.getItem('igf_' + k); if (v !== null) o[k] = JSON.parse(v); } catch (e) {} cb(o); },
+            set: function (o, cb) { try { Object.keys(o).forEach(function (k) { sessionStorage.setItem('igf_' + k, JSON.stringify(o[k])); }); } catch (e) {} if (cb) cb(); },
+          } },
+        };
+      };
+      const bridge = new URL('bridge.html', location.href).href;
+      const code = '(function(){var chrome=(' + shim.toString() + ')(' + JSON.stringify(bridge) + ',' + JSON.stringify(style) + ');if(!chrome)return;\n' + body + '\n})();';
+      link.href = 'javascript:' + encodeURIComponent(code);
+    } catch (e) {
+      $('bmFullNote').textContent = '（準備できませんでした：' + e.message + '）';
+    }
   })();
 
   // 小窓（pick.html）で選択が保存されたら読み直す

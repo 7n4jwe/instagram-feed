@@ -46,7 +46,7 @@
 
   // ---------- 選択の切り替え ----------
   async function toggle(post) {
-    if (!configured) { toast('最初に拡張の「設定」でトークンを入力してください', 'err'); send({ type: 'openOptions' }); return; }
+    if (!configured) { toast('最初に接続設定（トークン）を入力してください', 'err'); send({ type: 'openOptions' }); return; }
     if (busy.has(post.code)) return;
     const select = !selected.has(post.code);
     busy.add(post.code);
