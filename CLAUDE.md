@@ -24,6 +24,7 @@ Webサイト（Wix 等）に iframe で埋め込める Instagram 投稿の横ス
 - **選ぶ手段は Chrome 拡張（`extension/`、MV3、未公開・デベロッパーモードで読み込み）が主**（2026-11-11 決定）。content.js が Instagram の一覧の写真（`a[href*=/p/|/reel/]` かつ img を含む）に＋/✓ボタン、投稿表示中は右下 FAB、フィードは article 右上。background.js が GitHub Contents API で posts.json を read-modify-write（409/422 は3回まで再試行）。トークンは chrome.storage.local。ブックマークレット＋admin/pick.html は予備
 - **埋め込みは写真だけ**：`/p/{code}/embed/` を幅540pxで読み込み、transform で縮小・移動して写真の部分だけを高さ size に合わせて表示（幅は縦横比どおり）。埋め込みは「ヘッダー56px＋写真枠＋下部」でヘッダー＋下部＝208px が幅によらず一定なので、MEASURE の高さ−208＝写真枠の高さ（縦長は最大4:5、横長はそのまま）。リール（URLが /reel/）は4:5枠に9:16映像が黒帯つきで入るので中央の 9/16 幅だけ切り出す。拡張は動画を選んだとき postType=reel で保存。クリックで詳細モーダル（`/embed/captioned/`）。画像はコピーしない（権利面）。ヘッダーを隠すのは Meta 規約上グレーなので、写真の左下に @投稿者名 を出している（`who=0` で消せる）。`show_profiles` は既定オフ
 - 拡張の一覧ボタンは、投稿へのリンクで大きさ100px以上のもの（動画タイルは img が無いことがあるので画像の有無では判断しない）＋フィードの200px以上の動画/画像（親をたどって投稿リンクが1つだけの範囲を投稿とみなす）に付ける。ただしホームのフィード（time を含む article）は、写真・動画の上だと動画の再生用画像に隠れ、右上は「フォローする」と重なるため、操作アイコン列（保存アイコンの svg[aria-label=保存する] を含む section）の right:36px に置く（2026-11-12 ログイン中の実画面で確認）。広告（time 無し・投稿リンク無し）には付かない
+- 拡張の **選択モード**（1.1.0）：一覧ページで左下のスイッチ。オン中は window の捕捉段階で pointerdown/mousedown/mouseup/click を止め、一覧の写真（a.igf-host に .igf-tile があるもの）のクリックを選択／解除にする。状態は chrome.storage.local の pickMode。実 Instagram で実クリックが遷移しないことを確認済み
 
 ## 構成
 

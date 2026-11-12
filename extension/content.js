@@ -219,6 +219,53 @@
     paintButton(fab);
   }
 
+  // ---------- 選択モード（一覧の写真をクリックするだけで選択／解除） ----------
+  let pickMode = false;
+  try { chrome.storage.local.get('pickMode', (c) => { pickMode = !!(c && c.pickMode); updateModeToggle(); }); } catch (_) {}
+  function setPickMode(on) {
+    pickMode = on;
+    try { chrome.storage.local.set({ pickMode: on }); } catch (_) {}
+    updateModeToggle();
+    toast(on ? '選択モード：写真をクリックすると選択／解除します' : '選択モードを終了しました（クリックで投稿が開きます）', on ? 'ok' : '');
+  }
+  function updateModeToggle() {
+    // 一覧の写真があるページ（プロフィール・検索など）でだけ表示する。投稿を開いているときは出さない
+    const show = !!document.querySelector('.igf-tile') && !parsePost(location.pathname);
+    let t = document.querySelector('.igf-mode');
+    if (!show) { if (t) t.remove(); document.documentElement.classList.remove('igf-picking'); return; }
+    if (!t) {
+      t = document.createElement('button');
+      t.type = 'button';
+      t.className = 'igf-mode';
+      t.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); setPickMode(!pickMode); }, true);
+      document.body.appendChild(t);
+    }
+    t.classList.toggle('igf-mode-on', pickMode);
+    t.textContent = pickMode ? '✓ 選択モード中（写真をクリックで選択）— 終了' : '選択モード';
+    t.title = pickMode ? 'クリックで選択モードを終了' : '写真をクリックするだけで選べるようにする';
+    document.documentElement.classList.toggle('igf-picking', pickMode);
+  }
+  // 選択モード中は、一覧の写真のクリックで投稿を開かず、選択／解除する。
+  // Instagram の処理より先に受け取るため、window の捕捉段階で止める
+  function tileFromEvent(e) {
+    if (!pickMode || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return null;
+    const el = e.target instanceof Element ? e.target : null;
+    if (!el || el.closest('.igf-btn, .igf-mode')) return null; // ボタン自身の操作はそちらに任せる
+    const host = el.closest('a.igf-host');
+    return host && host.querySelector(':scope > .igf-tile') ? host : null;
+  }
+  ['pointerdown', 'mousedown', 'mouseup', 'pointerup', 'touchstart'].forEach((type) => window.addEventListener(type, (e) => {
+    if (tileFromEvent(e)) e.stopPropagation();
+  }, true));
+  window.addEventListener('click', (e) => {
+    const host = tileFromEvent(e);
+    if (!host) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const b = host.querySelector(':scope > .igf-tile');
+    toggle({ code: b.dataset.code, type: b.dataset.type, author: b.dataset.author });
+  }, true);
+
   // ---------- 監視 ----------
   let scheduled = false;
   function scan() {
@@ -230,6 +277,7 @@
       decorateArticles();
       decorateMedia();
       updateFab();
+      updateModeToggle();
     }, 250);
   }
   new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
