@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-12T06:12:54.022Z",
+  "updated_at": "2026-11-12T11:55:03.423Z",
   "profiles": [
     "7n4jwe",
     "samojet"
@@ -31,7 +31,7 @@
       "author": "sharegrid",
       "source": "manual",
       "added_at": "2026-11-12T04:04:29.304Z",
-      "approved": true,
+      "approved": false,
       "reviewed": true,
       "note": ""
     },
