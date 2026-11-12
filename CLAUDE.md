@@ -6,6 +6,7 @@ Webサイト（Wix 等）に iframe で埋め込める Instagram 投稿の横ス
 
 ## 決定事項
 
+- **Wix 公式の Instagram フィードアプリは使わない**：あれは Wix が審査済みアプリを持ち、連携（ログイン）した自分のアカウントの投稿だけを出す仕組み。他人の投稿はリポストしないと出せない。他人の投稿をリポストせず選んで出すため、この仕組みを続ける（2026-11-12 ユーザー決定）
 - **リポスト前提ではない**。他人のアカウントの投稿をそのまま表示する。
 - 表示は **Instagram 公式埋め込み**（`https://www.instagram.com/p/{code}/embed/`）。他人の画像をリポジトリに保存・再配信しない（権利面のため）。
 - **アカウント表示（API不要）**：公式プロフィール埋め込み `https://www.instagram.com/{username}/embed/`（最新6件・自動更新）。posts.json の `profiles` に保存。管理画面「投稿を選ぶ」に各アカウントの埋め込みを並べる。埋め込み内の投稿コードはクロスオリジンで読めないため、選択は **ブックマークレット「📌 投稿を選ぶ」**（Instagram の投稿ページで押す → `admin/pick.html#<URL>` を小窓で開き、localStorage の接続設定で posts.json を読み→approved:true→保存。409/422 は1回だけ読み直して再試行。BroadcastChannel `igfeed` で管理画面に通知し、未保存変更がなければ再読み込み）。ユーザーの選択でこの方式に決定（2026-11-11）。`show_profiles: false` で embed.html の先頭にアカウント枠を出さない（未設定=表示）。高さ通知（MEASURE）は0で来るので `w*2/3+152` で固定。localhost からの iframe では描画されない（GitHub Pages 上では表示を確認済み 2026-11-11）
