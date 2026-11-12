@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-12T06:12:47.386Z",
+  "updated_at": "2026-11-12T06:12:54.022Z",
   "profiles": [
     "7n4jwe",
     "samojet"
@@ -61,7 +61,7 @@
       "author": "7n4jwe",
       "source": "manual",
       "added_at": "2026-11-12T05:52:27.434Z",
-      "approved": true,
+      "approved": false,
       "reviewed": true,
       "note": ""
     }
