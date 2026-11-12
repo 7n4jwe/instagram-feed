@@ -36,6 +36,15 @@
   .thumb .hit { position: absolute; inset: 0; border: 0; padding: 0; margin: 0; background: transparent; cursor: pointer; z-index: 1; }
   .thumb .hit:hover { background: rgba(0,0,0,.08); }
   .thumb .hit:focus-visible { outline: 3px solid #1f6feb; outline-offset: -3px; }
+  /* 一覧でも操作できるモード（既定）：埋め込みを直接操作でき（動画の再生・複数枚の切り替え）、詳細は右上のボタンから */
+  .interactive .thumb { cursor: default; }
+  .interactive .thumb iframe { pointer-events: auto; }
+  .interactive .thumb .hit {
+    inset: auto; top: 6px; right: 6px; z-index: 2;
+    padding: 3px 10px; border-radius: 12px; background: rgba(0,0,0,.55); color: #fff;
+    font: 600 12px system-ui, -apple-system, "Hiragino Sans", sans-serif;
+  }
+  .interactive .thumb .hit:hover { background: rgba(0,0,0,.75); }
   .thumb .who {
     position: absolute; left: 6px; bottom: 6px; z-index: 1; pointer-events: none;
     max-width: calc(100% - 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -102,7 +111,9 @@
  *   max=50       表示する最大件数
  *   bg=ffffff    背景色（16進、#なし）
  *   who=0        写真の上の「@投稿者名」を出さない
- *   detail=link  クリックで詳細を開かず、Instagram の投稿ページを新しいタブで開く
+ *   detail=link  詳細を開かず、Instagram の投稿ページを新しいタブで開く
+ *   interact=0   一覧の写真は操作できないようにし、写真のどこをクリックしても詳細を開く
+ *                （既定は一覧でも動画の再生・複数枚の切り替えができ、詳細は右上の「詳細」ボタンから）
  *   w=326        アカウント枠の幅（アカウント枠を表示するときのみ）
  *   user=a,b     表示するアカウント枠を直接指定（posts.json の profiles より優先）
  *   posts=0      個別の投稿を表示しない（アカウント枠だけ表示）
@@ -120,6 +131,8 @@
   const max = num('max', 50);
   const showWho = q.get('who') !== '0';
   const detailLink = q.get('detail') === 'link';
+  const interactive = q.get('interact') !== '0';
+  if (interactive) document.documentElement.classList.add('interactive');
   const dataUrl = q.get('data') || 'data/posts.json';
   const userParam = q.get('user');
   const showPosts = q.get('posts') !== '0';
@@ -233,8 +246,8 @@
     if (e.key === 'ArrowRight' && cur < posts.length - 1) openDetail(cur + 1);
   });
   track.addEventListener('click', (e) => {
-    const t = e.target.closest('.thumb'); if (!t) return;
-    openDetail(Number(t.dataset.i));
+    if (!e.target.closest('.hit')) return;
+    openDetail(Number(e.target.closest('.thumb').dataset.i));
   });
 
   // ---------- 横スクロール ----------
@@ -290,7 +303,7 @@
         t.dataset.i = i;
         t.innerHTML = '<div class="ph">読み込み中…</div>' +
           (showWho && p.author ? '<span class="who">@' + esc(p.author) + '</span>' : '') +
-          '<button type="button" class="hit" aria-label="' + esc((p.author ? '@' + p.author + ' の' : '') + '投稿の詳細を見る') + '"></button>';
+          '<button type="button" class="hit" aria-label="' + esc((p.author ? '@' + p.author + ' の' : '') + '投稿の詳細を見る') + '">' + (interactive ? (detailLink ? 'Instagram ↗' : '詳細') : '') + '</button>';
         track.appendChild(t);
         io.observe(t);
       });
