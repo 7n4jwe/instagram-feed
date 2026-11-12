@@ -93,12 +93,16 @@
   function paint() { document.querySelectorAll('.igf-btn').forEach(paintButton); }
 
   // ---------- 一覧の写真にボタンを付ける ----------
+  // フィードの投稿（日時表示のある article）の中かどうか。そこは右上のボタンに任せる
+  // （動画の上には再生用の画像が重なるので、写真・動画の上にボタンを置くと隠れてしまう）
+  const inFeedPost = (el) => { const art = el.closest('article'); return !!(art && art.querySelector('time')); };
+
   function decorateTiles() {
     const user = pageUser();
     document.querySelectorAll('a[href]:not([data-igf="0"])').forEach((a) => {
       if (a.dataset.igf === '1' && a.querySelector(':scope > .igf-btn')) return; // 付与済み
       const post = parsePost(a.getAttribute('href'));
-      if (!post) { a.dataset.igf = '0'; return; }
+      if (!post || inFeedPost(a)) { a.dataset.igf = '0'; return; }
       // 写真・動画のタイル（ある程度大きいリンク）だけを対象にする。
       // 動画のタイルは <img> ではなく背景画像や <video> で描かれることがあるので、画像の有無ではなく大きさで判断する
       const r = a.getBoundingClientRect();
@@ -117,22 +121,35 @@
     });
   }
 
-  // ---------- ホームのフィード：各投稿の右上 ----------
+  // ---------- ホームのフィード：いいね・コメント・シェアの列の右側（保存アイコンの左） ----------
+  // 投稿の右上は「フォローする」ボタンと重なることがあり、写真・動画の上は再生用の画像に隠れるため、操作アイコンの列に置く
   function decorateArticles() {
-    document.querySelectorAll('article:not([data-igf])').forEach((art) => {
-      if (art.querySelector('.igf-tile')) { art.dataset.igf = '1'; return; }
+    document.querySelectorAll('article').forEach((art) => {
+      if (art.dataset.igf === '1' && art.querySelector('.igf-btn')) return; // 付与済み（描き直しで消えていたら付け直す）
+      if (!art.querySelector('time')) return; // 広告など投稿へのリンクが無いもの（後で読み込まれる場合に備えて印は付けない）
       const link = [...art.querySelectorAll('a[href]')].map((a) => parsePost(a.getAttribute('href'))).find(Boolean);
       if (!link) return;
       art.dataset.igf = '1';
+      if (art.querySelector('video')) link.type = 'reel'; // 動画は表示側で黒帯を除くためリールとして保存
       if (!link.author) {
-        const h = [...art.querySelectorAll('header a[href]')].map((a) => a.getAttribute('href').split('/').filter(Boolean)).find((p) => p.length === 1 && /^[A-Za-z0-9._]{1,30}$/.test(p[0]));
+        // 投稿の最初にあるプロフィールへのリンク（/ユーザー名/）が投稿者
+        const h = [...art.querySelectorAll('a[href^="/"]')].map((a) => a.getAttribute('href').split('?')[0].split('/').filter(Boolean)).find((p) => p.length === 1 && /^[A-Za-z0-9._]{1,30}$/.test(p[0]) && !RESERVED.has(p[0].toLowerCase()));
         if (h) link.author = h[0].toLowerCase();
       }
       if (getComputedStyle(art).position === 'static') art.style.position = 'relative';
-      art.classList.add('igf-host', 'igf-article');
-      const b = makeButton(link, 'igf-art');
-      art.appendChild(b);
-      paintButton(b);
+      art.classList.add('igf-host', 'igf-article'); // 選択中は投稿全体を緑の枠に
+      const save = [...art.querySelectorAll('svg[aria-label]')].find((v) => /^(保存する|保存を取り消す|保存|Save|Remove)$/.test(v.getAttribute('aria-label')));
+      const bar = save && save.closest('section');
+      if (bar && art.contains(bar)) {
+        if (getComputedStyle(bar).position === 'static') bar.style.position = 'relative';
+        const b = makeButton(link, 'igf-bar');
+        bar.appendChild(b);
+        paintButton(b);
+      } else {
+        const b = makeButton(link, 'igf-art'); // 列が見つからないときは右上
+        art.appendChild(b);
+        paintButton(b);
+      }
     });
   }
 
@@ -147,7 +164,7 @@
   function decorateMedia() {
     if (parsePost(location.pathname)) return; // 投稿を開いているときは右下のボタンで扱う
     document.querySelectorAll('video, img').forEach((m) => {
-      if (m.dataset.igf || m.closest('.igf-host')) return;
+      if (m.dataset.igf || m.closest('.igf-host') || inFeedPost(m)) return;
       const r = m.getBoundingClientRect();
       if (r.width < 200 || r.height < 200) return;
       let el = m.parentElement, post = null;

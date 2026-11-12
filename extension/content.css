@@ -13,8 +13,10 @@
 /* 一覧の写真：左上の丸ボタン */
 .igf-tile, .igf-art { position: absolute !important; width: 40px; height: 40px; border-radius: 50%; font-size: 24px; line-height: 1; }
 .igf-tile { top: 8px; left: 8px; }
-/* フィード：投稿の右上（… メニューと重ならない位置） */
+/* フィード：投稿の右上（操作アイコンの列が見つからないときの予備） */
 .igf-art { top: 10px; right: 52px; }
+/* フィード：いいね・コメント・シェアの列の右側、保存アイコンの左 */
+.igf-bar { position: absolute !important; right: 36px; top: 50%; margin-top: -17px; width: 34px; height: 34px; border-radius: 50%; font-size: 21px; line-height: 1; z-index: 3; }
 
 /* ボタンと枠が Instagram の上部バーなどに重ならないよう、写真ごとに重なり順を閉じる */
 .igf-host { isolation: isolate; }
