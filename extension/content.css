@@ -58,3 +58,21 @@
   content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
   background: rgba(31, 111, 235, .18); box-shadow: inset 0 0 0 3px #1f6feb;
 }
+
+/* アカウントバー（画面上部の中央） */
+.igf-bar-acc {
+  position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2147483000;
+  display: flex; align-items: center; gap: 6px; max-width: min(760px, 70vw); overflow-x: auto;
+  padding: 6px 8px; border-radius: 22px; background: rgba(255, 255, 255, .96);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, .3); scrollbar-width: none;
+  font: 600 13px system-ui, -apple-system, "Hiragino Sans", sans-serif; color: #222; white-space: nowrap;
+}
+.igf-bar-acc button { all: unset; box-sizing: border-box; cursor: pointer; font: inherit; white-space: nowrap; }
+.igf-acc-fold { color: #666; padding: 4px 6px; font-size: 12px !important; }
+.igf-acc { display: inline-flex; align-items: center; border: 1.5px solid #1f6feb; border-radius: 16px; color: #1f6feb; flex: none; }
+.igf-acc-go { padding: 4px 10px; }
+.igf-acc:hover { background: #eef4ff; }
+.igf-acc.igf-acc-here { background: #1f6feb; color: #fff; }
+.igf-acc-rm { padding: 4px 8px 4px 2px; opacity: .8; }
+.igf-acc-add { padding: 4px 10px; border: 1.5px dashed #1a7f37; border-radius: 16px; color: #1a7f37; flex: none; }
+.igf-acc-hint { color: #888; font-weight: 400; font-size: 12px; }

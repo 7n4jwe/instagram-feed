@@ -10,6 +10,8 @@
   const POST_RE = /\/(?:([A-Za-z0-9._]{1,30})\/)?(p|reels?|tv)\/([A-Za-z0-9_-]{5,})/;
   const RESERVED = new Set(['explore', 'accounts', 'direct', 'stories', 'reels', 'p', 'reel', 'tv', 'about', 'legal', 'developer']);
   let selected = new Set();
+  let profiles = []; // 登録アカウント（管理画面の「アカウント」と共通）
+  let counts = {};   // アカウントごとの選択中の件数
   let configured = true;
   const busy = new Set();
 
@@ -54,7 +56,8 @@
     const r = await send({ type: 'setSelected', code: post.code, postType: post.type, author: post.author, select });
     busy.delete(post.code);
     if (r && r.ok) {
-      selected = new Set(r.codes);
+      applyState(r);
+      renderBar();
       toast(select ? '✓ 選びました（' + selected.size + ' 件選択中）' : '選択を外しました', 'ok');
     } else {
       if (select) selected.delete(post.code); else selected.add(post.code);
@@ -266,6 +269,56 @@
     toggle({ code: b.dataset.code, type: b.dataset.type, author: b.dataset.author });
   }, true);
 
+  // ---------- アカウントバー（登録アカウントをワンクリックで行き来する） ----------
+  let barOpen = true;
+  try { chrome.storage.local.get('barOpen', (c) => { if (c && c.barOpen === false) { barOpen = false; renderBar(); } }); } catch (_) {}
+  function goAccount(user) {
+    // 移動先ですぐ選べるよう、選択モードをオンにしてからプロフィールへ
+    pickMode = true;
+    try { chrome.storage.local.set({ pickMode: true }, () => { location.href = 'https://www.instagram.com/' + encodeURIComponent(user) + '/'; }); }
+    catch (_) { location.href = 'https://www.instagram.com/' + encodeURIComponent(user) + '/'; }
+  }
+  async function changeProfile(user, add) {
+    const r = await send({ type: 'setProfile', user, add });
+    if (r && r.ok) { applyState(r); toast(add ? '@' + user + ' を登録しました' : '@' + user + ' を一覧から外しました', 'ok'); }
+    else toast('保存できませんでした：' + ((r && r.error) || '不明なエラー'), 'err');
+    renderBar();
+  }
+  function renderBar() {
+    let bar = document.querySelector('.igf-bar-acc');
+    if (!configured) { if (bar) bar.remove(); return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'igf-bar-acc';
+      bar.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-act]'); if (!b) return;
+        e.preventDefault(); e.stopPropagation();
+        if (b.dataset.act === 'go') goAccount(b.dataset.user);
+        if (b.dataset.act === 'add') changeProfile(b.dataset.user, true);
+        if (b.dataset.act === 'rm') changeProfile(b.dataset.user, false);
+        if (b.dataset.act === 'fold') { barOpen = !barOpen; try { chrome.storage.local.set({ barOpen }); } catch (_) {} renderBar(); }
+      }, true);
+      document.body.appendChild(bar);
+    }
+    const here = parsePost(location.pathname) ? '' : pageUser();
+    const key = [barOpen, here, profiles.join(','), profiles.map((u) => counts[u] || 0).join(',')].join('|');
+    if (bar.dataset.key === key) return; // 変化が無ければ描き直さない
+    bar.dataset.key = key;
+    bar.textContent = '';
+    const mk = (tag, cls, text, data) => { const el = document.createElement(tag); el.className = cls; el.textContent = text; Object.assign(el.dataset, data || {}); return el; };
+    bar.appendChild(mk('button', 'igf-acc-fold', barOpen ? '選ぶアカウント ▾' : '選ぶアカウント ▸', { act: 'fold' }));
+    if (!barOpen) return;
+    profiles.forEach((u) => {
+      const chip = mk('span', 'igf-acc' + (u === here ? ' igf-acc-here' : ''), '', {});
+      chip.appendChild(mk('button', 'igf-acc-go', '@' + u + (counts[u] ? ' ✓' + counts[u] : ''), { act: 'go', user: u }));
+      if (u === here) chip.appendChild(mk('button', 'igf-acc-rm', '×', { act: 'rm', user: u }));
+      bar.appendChild(chip);
+    });
+    if (!profiles.length) bar.appendChild(mk('span', 'igf-acc-hint', 'プロフィールを開いて「＋登録」', {}));
+    // 表示中のプロフィールが未登録なら登録ボタン（一覧の写真があるページ＝プロフィールのときだけ）
+    if (here && !profiles.includes(here) && document.querySelector('.igf-tile')) bar.appendChild(mk('button', 'igf-acc-add', '＋ @' + here + ' を登録', { act: 'add', user: here }));
+  }
+
   // ---------- 監視 ----------
   let scheduled = false;
   function scan() {
@@ -278,17 +331,24 @@
       decorateMedia();
       updateFab();
       updateModeToggle();
+      renderBar();
     }, 250);
   }
   new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
   let lastHref = location.href;
   setInterval(() => { if (location.href !== lastHref) { lastHref = location.href; scan(); } }, 400);
 
+  function applyState(r) {
+    selected = new Set(r.codes);
+    profiles = Array.isArray(r.profiles) ? r.profiles : [];
+    counts = r.counts || {};
+  }
   async function refresh(force) {
     const r = await send({ type: 'getSelected', force });
-    if (r && r.ok) { configured = true; selected = new Set(r.codes); }
+    if (r && r.ok) { configured = true; applyState(r); }
     else if (r && r.error === 'notConfigured') configured = false;
     paint();
+    renderBar();
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(false); });
 

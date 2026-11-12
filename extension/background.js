@@ -36,17 +36,22 @@ async function readPosts(cfg) {
   return { sha: j.sha, data };
 }
 
+// 選択中の投稿コード・登録アカウント・アカウントごとの選択件数を覚えておく
 function remember(data) {
-  cache = { codes: data.posts.filter((p) => p.approved).map((p) => p.code), at: Date.now() };
-  return cache.codes;
+  const approved = data.posts.filter((p) => p.approved);
+  const counts = {};
+  approved.forEach((p) => { if (p.author) counts[p.author] = (counts[p.author] || 0) + 1; });
+  cache = { codes: approved.map((p) => p.code), profiles: Array.isArray(data.profiles) ? data.profiles : [], counts, at: Date.now() };
+  return view();
 }
+const view = () => ({ codes: cache.codes, profiles: cache.profiles, counts: cache.counts });
 
 async function getSelected(force) {
   const cfg = await getCfg();
   if (!configured(cfg)) return { ok: false, error: 'notConfigured' };
-  if (!force && cache && Date.now() - cache.at < CACHE_MS) return { ok: true, codes: cache.codes };
+  if (!force && cache && Date.now() - cache.at < CACHE_MS) return { ok: true, ...view() };
   const { data } = await readPosts(cfg);
-  return { ok: true, codes: remember(data) };
+  return { ok: true, ...remember(data) };
 }
 
 // 読む→変更→書く。他で更新されていたら（409/422）読み直してやり直す
@@ -57,7 +62,7 @@ async function setSelected({ code, postType, author, select }) {
     const { sha, data } = await readPosts(cfg);
     let p = data.posts.find((x) => x.code === code);
     const before = !!(p && p.approved);
-    if (before === select) return { ok: true, codes: remember(data), selected: select };
+    if (before === select) return { ok: true, ...remember(data), selected: select };
     if (select) {
       if (p) { p.approved = true; p.reviewed = true; if (!p.author && author) p.author = author; }
       else {
@@ -74,7 +79,32 @@ async function setSelected({ code, postType, author, select }) {
         method: 'PUT',
         body: JSON.stringify({ message: (select ? 'Select' : 'Unselect') + ' post ' + code, sha, branch: cfg.branch, content: b64enc(JSON.stringify(data, null, 2) + '\n') }),
       });
-      return { ok: true, codes: remember(data), selected: select };
+      return { ok: true, ...remember(data), selected: select };
+    } catch (e) {
+      if ((e.status === 409 || e.status === 422) && attempt < 2) continue;
+      throw e;
+    }
+  }
+}
+
+// アカウントを登録／解除（管理画面の「アカウント」と同じ data/posts.json の profiles）
+async function setProfile({ user, add }) {
+  const cfg = await getCfg();
+  if (!configured(cfg)) return { ok: false, error: 'notConfigured' };
+  if (!/^[a-z0-9._]{1,30}$/.test(user || '')) return { ok: false, error: 'ユーザー名が正しくありません' };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { sha, data } = await readPosts(cfg);
+    data.profiles = Array.isArray(data.profiles) ? data.profiles : [];
+    const has = data.profiles.includes(user);
+    if (has === add) return { ok: true, ...remember(data) };
+    if (add) data.profiles.push(user); else data.profiles = data.profiles.filter((u) => u !== user);
+    data.updated_at = new Date().toISOString();
+    try {
+      await gh(cfg, '/contents/' + FILE, {
+        method: 'PUT',
+        body: JSON.stringify({ message: (add ? 'Add' : 'Remove') + ' account ' + user, sha, branch: cfg.branch, content: b64enc(JSON.stringify(data, null, 2) + '\n') }),
+      });
+      return { ok: true, ...remember(data) };
     } catch (e) {
       if ((e.status === 409 || e.status === 422) && attempt < 2) continue;
       throw e;
@@ -87,6 +117,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
     try {
       if (msg.type === 'getSelected') return reply(await getSelected(msg.force));
       if (msg.type === 'setSelected') return reply(await setSelected(msg));
+      if (msg.type === 'setProfile') return reply(await setProfile(msg));
       if (msg.type === 'openOptions') { chrome.runtime.openOptionsPage(); return reply({ ok: true }); }
       if (msg.type === 'getCfg') { const c = await getCfg(); return reply({ ok: true, owner: c.owner, repo: c.repo, branch: c.branch, configured: configured(c) }); }
       reply({ ok: false, error: 'unknown' });
