@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-12T05:52:20.201Z",
+  "updated_at": "2026-11-12T05:52:25.411Z",
   "profiles": [
     "7n4jwe",
     "samojet"
@@ -41,6 +41,16 @@
       "author": "7n4jwe",
       "source": "manual",
       "added_at": "2026-11-12T05:52:20.201Z",
+      "approved": true,
+      "reviewed": true,
+      "note": ""
+    },
+    {
+      "code": "CXXoR8yJ7dK",
+      "url": "https://www.instagram.com/p/CXXoR8yJ7dK/",
+      "author": "7n4jwe",
+      "source": "manual",
+      "added_at": "2026-11-12T05:52:25.411Z",
       "approved": true,
       "reviewed": true,
       "note": ""
