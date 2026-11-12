@@ -99,9 +99,14 @@
       if (a.dataset.igf === '1' && a.querySelector(':scope > .igf-btn')) return; // 付与済み
       const post = parsePost(a.getAttribute('href'));
       if (!post) { a.dataset.igf = '0'; return; }
-      if (!a.querySelector('img, video')) return; // 画像がまだ無い（後で再確認）
+      // 写真・動画のタイル（ある程度大きいリンク）だけを対象にする。
+      // 動画のタイルは <img> ではなく背景画像や <video> で描かれることがあるので、画像の有無ではなく大きさで判断する
       const r = a.getBoundingClientRect();
-      if (r.width && r.width < 80) { a.dataset.igf = '0'; return; } // 小さなリンクは対象外
+      if (!r.width || !r.height) return; // まだ表示されていない（後で再確認）
+      if (r.width < 100 || r.height < 100) {
+        if (!a.querySelector('img, video')) { a.dataset.igf = '0'; return; } // 文字だけの小さなリンク（日時など）
+        if (r.width < 80) { a.dataset.igf = '0'; return; }
+      }
       a.dataset.igf = '1';
       if (!post.author && user) post.author = user;
       if (getComputedStyle(a).position === 'static') a.style.position = 'relative';
@@ -131,10 +136,50 @@
     });
   }
 
+  // ---------- フィードなどの大きな動画・写真（リンクで囲まれていないもの） ----------
+  // 動画の投稿は <article> の外に描かれたり、写真のようなリンクで囲まれていないことがあるので、
+  // 大きな動画／画像から親をたどり、投稿へのリンクが1つだけ見つかった範囲をその投稿とみなす
+  function postInside(el) {
+    const codes = new Map();
+    el.querySelectorAll('a[href]').forEach((a) => { const p = parsePost(a.getAttribute('href')); if (p && !codes.has(p.code)) codes.set(p.code, p); });
+    return codes;
+  }
+  function decorateMedia() {
+    if (parsePost(location.pathname)) return; // 投稿を開いているときは右下のボタンで扱う
+    document.querySelectorAll('video, img').forEach((m) => {
+      if (m.dataset.igf || m.closest('.igf-host')) return;
+      const r = m.getBoundingClientRect();
+      if (r.width < 200 || r.height < 200) return;
+      let el = m.parentElement, post = null;
+      for (let k = 0; k < 25 && el && el !== document.body; k++, el = el.parentElement) {
+        const codes = postInside(el);
+        if (codes.size === 1) { post = [...codes.values()][0]; break; }
+        if (codes.size > 1) break; // 複数の投稿を含む範囲まで来たら諦める
+      }
+      m.dataset.igf = post ? '1' : '0';
+      if (!post) return;
+      if (m.tagName === 'VIDEO') post.type = 'reel'; // 動画は表示側で黒帯を除くためリールとして保存
+      if (!post.author) {
+        const h = [...el.querySelectorAll('a[href]')].map((a) => a.getAttribute('href').split('/').filter(Boolean)).find((p) => p.length === 1 && /^[A-Za-z0-9._]{1,30}$/.test(p[0]) && !RESERVED.has(p[0].toLowerCase()));
+        if (h) post.author = h[0].toLowerCase();
+      }
+      // 同じ投稿にすでにボタンがあれば付けない（写真が複数枚の投稿など）
+      if (el.querySelector('.igf-btn[data-code="' + CSS.escape(post.code) + '"]')) return;
+      const host = m.parentElement;
+      if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+      host.classList.add('igf-host');
+      const b = makeButton(post, 'igf-tile');
+      host.appendChild(b);
+      paintButton(b);
+    });
+  }
+
   // ---------- 投稿を開いているとき：右下の大きなボタン ----------
   function currentPost() {
     const post = parsePost(location.pathname);
     if (!post) return null;
+    // /p/ のURLでも中身が動画ならリールとして保存（表示側で黒帯を除くため）
+    if (post.type === 'p' && [...document.querySelectorAll('main video, [role="dialog"] video')].some((v) => v.getBoundingClientRect().width >= 200)) post.type = 'reel';
     if (!post.author) {
       // 投稿ページの og:url（/ユーザー名/p/コード/）から投稿者を取る
       const og = document.querySelector('meta[property="og:url"]');
@@ -166,6 +211,7 @@
       scheduled = false;
       decorateTiles();
       decorateArticles();
+      decorateMedia();
       updateFab();
     }, 250);
   }

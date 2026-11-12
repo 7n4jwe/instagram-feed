@@ -21,16 +21,16 @@
     scrollbar-width: thin;
     -webkit-overflow-scrolling: touch;
   }
-  /* 写真だけのサムネイル：公式埋め込みのヘッダー部分を隠して写真の部分だけを見せる */
+  /* 写真だけのサムネイル：高さをそろえ、幅は投稿の縦横比に合わせる（JS で幅と拡大率を設定） */
   .thumb {
-    flex: 0 0 var(--size); width: var(--size); height: var(--size);
+    flex: 0 0 auto; width: calc(var(--size) * 0.8); height: var(--size);
     position: relative; overflow: hidden; scroll-snap-align: start;
     border-radius: 8px; background: #eee; cursor: pointer;
   }
-  /* 公式埋め込みの写真部分は常に 4:5（縦長）なので、ヘッダー(約56px)を隠し、上下の中央を正方形で切り出す */
+  /* 公式埋め込みを幅540pxで読み込み（縮小して使うので画像がぼやけない）、ヘッダーを隠して写真の部分だけが枠に収まるよう縮小・移動する */
   .thumb iframe {
-    position: absolute; top: calc(-56px - var(--size) * 0.125); left: -1px; border: 0;
-    width: calc(var(--size) + 2px); height: calc(var(--size) * 1.6 + 120px);
+    position: absolute; top: 0; left: 0; border: 0;
+    width: 540px; height: 1100px; transform-origin: 0 0;
     pointer-events: none;
   }
   .thumb .hit { position: absolute; inset: 0; border: 0; padding: 0; margin: 0; background: transparent; cursor: pointer; z-index: 1; }
@@ -93,11 +93,11 @@
 <script>
 /*
  * 選んだ投稿（approved: true）を「写真だけ」横スクロールで並べ、クリックで詳細（本文付きの公式埋め込み）を開く。
- * 写真のサムネイルは公式埋め込み（/p/{code}/embed/）のヘッダーを隠したもの。画像をコピーしないので、
+ * 写真のサムネイルは公式埋め込み（/p/{code}/embed/）のヘッダーと下の部分を隠し、写真の部分だけを縮小したもの。画像をコピーしないので、
  * 投稿者が削除・非公開にすると自動的に表示されなくなる。
  *
  * URLパラメータ:
- *   size=240     写真の一辺(px)
+ *   size=240     写真の高さ(px)。幅は投稿の縦横比に合わせる
  *   auto=5       5秒ごとに自動スクロール（0で無効）
  *   max=50       表示する最大件数
  *   bg=ffffff    背景色（16進、#なし）
@@ -155,16 +155,43 @@
         f.title = '';
         f.setAttribute('aria-hidden', 'true');
         el.querySelector('.ph').replaceWith(f);
+        layoutThumb(el, null);
       }
     });
   }, { root: track, rootMargin: '0px ' + (size * 3) + 'px' });
 
-  // 詳細とアカウント枠は、公式埋め込みが送ってくる高さに合わせる（写真サムネイルは固定）
+  /*
+   * サムネイルの配置。公式埋め込み（幅540px）は
+   *   ヘッダー 56px ＋ 写真の枠（高さは投稿の縦横比で決まる。縦長は最大 4:5）＋ 下の部分
+   * で、ヘッダーと下の部分の合計は 208px で一定。なので MEASURE の高さから写真の枠の高さが分かる。
+   * 動画（リール）は 4:5 の枠の中に 9:16 の映像が左右黒帯つきで入るので、映像の部分だけを切り出す。
+   */
+  const EW = 540, HEAD = 56, CHROME = 208, TRIM = 4;
+  function layoutThumb(el, totalH) {
+    let mediaH = totalH ? totalH - CHROME : EW * 1.25; // 高さが分かるまでは 4:5 と仮定
+    if (!(mediaH > 40)) mediaH = EW * 1.25;
+    let visW = EW, left = 0;
+    if (el.dataset.kind === 'reel' && Math.abs(mediaH - EW * 1.25) < 4) {
+      visW = Math.round(mediaH * 9 / 16); // 黒帯を除いた映像の幅
+      left = (EW - visW) / 2;
+    }
+    const visH = mediaH - TRIM; // 枠の端の白い線が入らないよう少しだけ内側
+    const scale = size / visH;
+    el.style.width = Math.round(visW * scale) + 'px';
+    const f = el.querySelector('iframe');
+    if (f) f.style.transform = 'translate(' + (-left * scale) + 'px,' + (-HEAD * scale) + 'px) scale(' + scale + ')';
+    updateNav();
+  }
+
+  // サムネイル・詳細・アカウント枠は、公式埋め込みが送ってくる高さを使う
   window.addEventListener('message', (ev) => {
     if (!/^https:\/\/(www\.)?instagram\.com$/.test(ev.origin)) return;
     let d = ev.data;
     if (typeof d === 'string') { try { d = JSON.parse(d); } catch (_) { return; } }
     if (!d || d.type !== 'MEASURE' || !d.details || !d.details.height) return;
+    for (const f of document.querySelectorAll('.thumb iframe')) {
+      if (f.contentWindow === ev.source) { layoutThumb(f.closest('.thumb'), d.details.height); return; }
+    }
     for (const f of document.querySelectorAll('#mFrame, .card iframe')) {
       if (f.contentWindow === ev.source) { f.style.height = Math.ceil(d.details.height) + 'px'; break; }
     }
@@ -259,6 +286,7 @@
         const t = document.createElement('div');
         t.className = 'thumb';
         t.dataset.code = p.code;
+        t.dataset.kind = /\/(reels?|tv)\//.test(p.url || '') ? 'reel' : 'p';
         t.dataset.i = i;
         t.innerHTML = '<div class="ph">読み込み中…</div>' +
           (showWho && p.author ? '<span class="who">@' + esc(p.author) + '</span>' : '') +
