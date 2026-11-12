@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-11T08:58:19.992Z",
+  "updated_at": "2026-11-12T04:04:27.172Z",
   "profiles": [
     "7n4jwe",
     "samojet"
@@ -11,6 +11,16 @@
       "author": "",
       "source": "manual",
       "added_at": "2026-11-11T08:58:19.992Z",
+      "approved": true,
+      "reviewed": true,
+      "note": ""
+    },
+    {
+      "code": "DDq4yZvytJo",
+      "url": "https://www.instagram.com/p/DDq4yZvytJo/",
+      "author": "samojet",
+      "source": "manual",
+      "added_at": "2026-11-12T04:04:27.172Z",
       "approved": true,
       "reviewed": true,
       "note": ""
